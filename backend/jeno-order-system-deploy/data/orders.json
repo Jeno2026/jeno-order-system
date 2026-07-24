@@ -1,15 +1,1 @@
-[
-  {
-    "id": "order_1784870749533",
-    "items": {
-      "item1": {
-        "name": "Chocolate Cake",
-        "price": 6,
-        "qty": 2
-      }
-    },
-    "total": 12,
-    "createdAt": "2026-07-24T05:25:49.533Z",
-    "status": "received"
-  }
-]
+[]
