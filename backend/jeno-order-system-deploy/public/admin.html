@@ -245,6 +245,30 @@
     background: #e6e0d6;
     color: #4a453d;
   }
+  .image-upload-box {
+    border: 1px dashed #cfc7ba;
+    border-radius: 8px;
+    padding: 12px;
+    background: #faf8f4;
+  }
+  .image-upload-box input[type="file"] {
+    border: 0;
+    padding: 4px 0;
+  }
+  .image-preview {
+    display: none;
+    width: 110px;
+    height: 110px;
+    margin-top: 10px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #e6e0d6;
+  }
+  .upload-note {
+    margin: 6px 0 0;
+    color: #877d70;
+    font-size: 11px;
+  }
   @media (max-width: 600px) {
     .form-row {
       grid-template-columns: 1fr;
@@ -302,11 +326,19 @@
     <div class="form-row">
       <div>
         <label for="productImage">Image path</label>
-        <input type="text" id="productImage" placeholder="/images/chocolate-cake.png">
+        <input type="text" id="productImage" placeholder="/images/chocolate-cake.png" oninput="showImagePreview(this.value.trim())">
       </div>
       <div>
         <label for="productEmoji">Icon (emoji fallback)</label>
         <input type="text" id="productEmoji" placeholder="🍰">
+      </div>
+    </div>
+    <div class="form-row full">
+      <div class="image-upload-box">
+        <label for="productImageFile">Upload product image</label>
+        <input type="file" id="productImageFile" accept="image/png,image/jpeg,image/webp,image/gif" onchange="uploadProductImage(this)">
+        <p class="upload-note">PNG, JPEG, WebP or GIF; maximum 5 MB.</p>
+        <img class="image-preview" id="productImagePreview" alt="Product image preview">
       </div>
     </div>
     <div class="form-row full">
@@ -581,6 +613,61 @@
     return "quantity";
   }
 
+  async function uploadProductImage(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type)) {
+      showAddStatus("Please choose a PNG, JPEG, WebP, or GIF image.", "error");
+      input.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showAddStatus("Image must be smaller than 5 MB.", "error");
+      input.value = "";
+      return;
+    }
+
+    showAddStatus("Uploading image...", "success");
+    try {
+      const data = await readFileAsDataUrl(file);
+      const res = await fetch("/api/uploads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, data }),
+      });
+      if (!res.ok) throw new Error("Upload failed");
+
+      const result = await res.json();
+      document.getElementById("productImage").value = result.image;
+      showImagePreview(result.image);
+      showAddStatus("Image uploaded!", "success");
+    } catch (err) {
+      showAddStatus("Could not upload the image.", "error");
+    }
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function showImagePreview(src) {
+    const preview = document.getElementById("productImagePreview");
+    if (!src) {
+      preview.style.display = "none";
+      preview.removeAttribute("src");
+      return;
+    }
+    preview.src = src;
+    preview.style.display = "block";
+  }
+
   function emojiForCategory(category) {
     if (category === "Cakes") return "🍰";
     if (category === "Cinnamon Rolls") return "🌀";
@@ -658,6 +745,8 @@
     document.getElementById("productCategory").value = product.category;
     document.getElementById("productName").value = product.name;
     document.getElementById("productImage").value = product.image || "";
+    document.getElementById("productImageFile").value = "";
+    showImagePreview(product.image || "");
     document.getElementById("productDescription").value = product.description || "";
     document.getElementById("productEmoji").value = product.emoji || "";
     renderVariantRows(
@@ -676,6 +765,8 @@
     document.getElementById("productCategory").value = "Cakes";
     document.getElementById("productName").value = "";
     document.getElementById("productImage").value = "";
+    document.getElementById("productImageFile").value = "";
+    showImagePreview("");
     document.getElementById("productDescription").value = "";
     document.getElementById("productEmoji").value = "";
     renderVariantRows(categoryDefaults("Cakes"));
