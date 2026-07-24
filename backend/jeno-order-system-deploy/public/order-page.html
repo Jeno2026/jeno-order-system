@@ -478,6 +478,39 @@
   .detail-add-btn:hover {
     background: #6e6459;
   }
+  .quantity-row {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 24px;
+  }
+  .quantity-row.visible {
+    display: flex;
+  }
+  .quantity-control {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border: 1px solid #d8d0c2;
+    border-radius: 8px;
+    background: white;
+    padding: 5px;
+  }
+  .quantity-control button {
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 5px;
+    background: #eee8de;
+    color: #4a453d;
+    font-size: 20px;
+    cursor: pointer;
+  }
+  .quantity-control span {
+    min-width: 18px;
+    text-align: center;
+    font-weight: 700;
+  }
   @media (max-width: 700px) {
     .product-detail {
       padding: 0;
@@ -610,9 +643,17 @@
       <p class="product-detail-kicker">Made to order</p>
       <h2 class="product-detail-title" id="detailTitle"></h2>
       <p class="product-detail-description" id="detailDescription"></p>
-      <div class="size-label">Choose a size</div>
+      <div class="size-label" id="optionLabel">Choose a size</div>
       <div class="size-options" id="sizeOptions"></div>
-      <button class="detail-add-btn" id="detailAddButton" onclick="addConfiguredCake()">Add to cart — $35.00</button>
+      <div class="quantity-row" id="quantityRow">
+        <span class="size-label">Quantity</span>
+        <div class="quantity-control">
+          <button onclick="changeDetailQuantity(-1)" aria-label="Decrease quantity">&minus;</button>
+          <span id="detailQuantity">1</span>
+          <button onclick="changeDetailQuantity(1)" aria-label="Increase quantity">+</button>
+        </div>
+      </div>
+      <button class="detail-add-btn" id="detailAddButton" onclick="addConfiguredProduct()">Add to cart — $35.00</button>
     </div>
   </div>
 </div>
@@ -690,8 +731,11 @@
   // Cart is stored as an object: { itemId: { name, price, qty } }
   let cart = {};
   let allProducts = []; // Cache of products loaded from the server
-  let activeCake = null;
+  let activeProduct = null;
+  let activeProductType = null;
   let selectedCakeSize = '4"';
+  let selectedRollPack = "single";
+  let detailQuantity = 1;
   const cakeSizes = [
     { label: '4"', price: 35 },
     { label: '6"', price: 50 },
@@ -713,6 +757,24 @@
     item4: {
       image: "/images/lemon-cake.png",
       description: "Bright lemon cake layered with delicate lemon buttercream and finished with candied citrus."
+    },
+  };
+  const rollDetails = {
+    item5: {
+      image: "/images/classic-cinnamon-roll.png",
+      description: "A soft, slow-risen cinnamon roll layered with fragrant cinnamon sugar and finished with a delicate vanilla glaze."
+    },
+    item6: {
+      image: "/images/maple-pecan-roll.png",
+      description: "Our tender cinnamon roll finished with amber maple glaze and toasted pecans for a warm, nutty crunch."
+    },
+    item7: {
+      image: "/images/cream-cheese-roll.png",
+      description: "A classic cinnamon spiral generously finished with smooth, tangy cream cheese frosting."
+    },
+    item8: {
+      image: "/images/chocolate-swirl-roll.png",
+      description: "A buttery cinnamon roll layered with rich chocolate filling and finished with a restrained chocolate drizzle."
     },
   };
 
@@ -766,20 +828,20 @@
 
       for (const p of groups[category]) {
         const cardId = "card_" + p.id;
-        const isCake = Boolean(cakeDetails[p.id]);
-        const action = isCake
+        const hasDetail = Boolean(cakeDetails[p.id] || rollDetails[p.id]);
+        const action = hasDetail
           ? "openProductDetail('" + p.id + "')"
           : "addToCart('" + p.id + "', '" +
             escapeHtml(p.name).replace(/'/g, "\\'") + "', " + p.price + ", '" + cardId + "')";
         html += '<div class="card" id="' + cardId + '" onclick="' + action + '">';
         html += '<div class="card-img">' +
-          (isCake
-            ? '<img src="' + cakeDetails[p.id].image + '" alt="' + escapeHtml(p.name) + '">'
+          (hasDetail
+            ? '<img src="' + (cakeDetails[p.id] || rollDetails[p.id]).image + '" alt="' + escapeHtml(p.name) + '">'
             : p.emoji) + "</div>";
         html += '<div class="card-body">';
         html += '<p class="card-name">' + escapeHtml(p.name) + "</p>";
         html += '<p class="card-price">' +
-          (isCake ? "From $35.00" : "$" + Number(p.price).toFixed(2)) + "</p>";
+          (cakeDetails[p.id] ? "From $35.00" : "$" + Number(p.price).toFixed(2)) + "</p>";
         html += "</div></div>";
       }
 
@@ -802,16 +864,19 @@
 
   function openProductDetail(productId) {
     const product = allProducts.find((item) => item.id === productId);
-    const detail = cakeDetails[productId];
+    const detail = cakeDetails[productId] || rollDetails[productId];
     if (!product || !detail) return;
 
-    activeCake = product;
+    activeProduct = product;
+    activeProductType = cakeDetails[productId] ? "cake" : "roll";
     selectedCakeSize = '4"';
+    selectedRollPack = "single";
+    detailQuantity = 1;
     document.getElementById("detailTitle").innerText = product.name;
     document.getElementById("detailDescription").innerText = detail.description;
     document.getElementById("detailImage").src = detail.image;
     document.getElementById("detailImage").alt = product.name;
-    renderSizeOptions();
+    renderProductOptions();
     document.getElementById("productDetail").classList.add("open");
     document.body.style.overflow = "hidden";
   }
@@ -821,32 +886,84 @@
     document.body.style.overflow = "";
   }
 
-  function renderSizeOptions() {
-    document.getElementById("sizeOptions").innerHTML = cakeSizes.map((size, index) =>
-      '<button class="size-option' + (size.label === selectedCakeSize ? " selected" : "") +
-      '" onclick="selectCakeSize(' + index + ')">' +
-      size.label + "<br>$" + size.price.toFixed(2) + "</button>"
-    ).join("");
-    const selected = cakeSizes.find((size) => size.label === selectedCakeSize);
+  function renderProductOptions() {
+    const optionLabel = document.getElementById("optionLabel");
+    const quantityRow = document.getElementById("quantityRow");
+    let selectedPrice = 0;
+
+    if (activeProductType === "cake") {
+      optionLabel.innerText = "Choose a size";
+      quantityRow.classList.remove("visible");
+      document.getElementById("sizeOptions").innerHTML = cakeSizes.map((size, index) =>
+        '<button class="size-option' + (size.label === selectedCakeSize ? " selected" : "") +
+        '" onclick="selectCakeSize(' + index + ')">' +
+        size.label + "<br>$" + size.price.toFixed(2) + "</button>"
+      ).join("");
+      selectedPrice = cakeSizes.find((size) => size.label === selectedCakeSize).price;
+    } else {
+      const singlePrice = Number(activeProduct.price);
+      const rollPacks = [
+        { value: "single", label: "1 roll", price: singlePrice },
+        { value: "dozen", label: "Dozen (12)", price: singlePrice * 12 },
+      ];
+      optionLabel.innerText = "Choose a pack";
+      quantityRow.classList.add("visible");
+      document.getElementById("detailQuantity").innerText = detailQuantity;
+      document.getElementById("sizeOptions").innerHTML = rollPacks.map((pack, index) =>
+        '<button class="size-option' + (pack.value === selectedRollPack ? " selected" : "") +
+        '" onclick="selectRollPack(' + index + ')">' +
+        pack.label + "<br>$" + pack.price.toFixed(2) + "</button>"
+      ).join("");
+      selectedPrice = rollPacks.find((pack) => pack.value === selectedRollPack).price;
+    }
+
     document.getElementById("detailAddButton").innerText =
-      "Add to cart — $" + selected.price.toFixed(2);
+      "Add to cart — $" + (selectedPrice * detailQuantity).toFixed(2);
   }
 
   function selectCakeSize(sizeIndex) {
     selectedCakeSize = cakeSizes[sizeIndex].label;
-    renderSizeOptions();
+    renderProductOptions();
   }
 
-  function addConfiguredCake() {
-    if (!activeCake) return;
-    const selected = cakeSizes.find((size) => size.label === selectedCakeSize);
-    const cartId = activeCake.id + "_" + selectedCakeSize.replace('"', "in");
-    addToCart(
-      cartId,
-      activeCake.name + " — " + selectedCakeSize,
-      selected.price,
-      "card_" + activeCake.id
-    );
+  function selectRollPack(packIndex) {
+    selectedRollPack = packIndex === 0 ? "single" : "dozen";
+    renderProductOptions();
+  }
+
+  function changeDetailQuantity(change) {
+    detailQuantity = Math.max(1, Math.min(99, detailQuantity + change));
+    renderProductOptions();
+  }
+
+  function addConfiguredProduct() {
+    if (!activeProduct) return;
+
+    let optionName;
+    let price;
+    if (activeProductType === "cake") {
+      const selected = cakeSizes.find((size) => size.label === selectedCakeSize);
+      optionName = selectedCakeSize;
+      price = selected.price;
+    } else {
+      const multiplier = selectedRollPack === "dozen" ? 12 : 1;
+      optionName = selectedRollPack === "dozen" ? "Dozen (12)" : "1 roll";
+      price = Number(activeProduct.price) * multiplier;
+    }
+
+    const cartId = activeProduct.id + "_" + optionName.replace(/[^a-z0-9]+/gi, "-");
+    if (cart[cartId]) {
+      cart[cartId].qty += detailQuantity;
+    } else {
+      cart[cartId] = {
+        name: activeProduct.name + " — " + optionName,
+        price: price,
+        qty: detailQuantity,
+      };
+    }
+    updateCartBadge();
+    renderCartPanel();
+    showAddedFeedback("card_" + activeProduct.id);
     closeProductDetail();
   }
 
