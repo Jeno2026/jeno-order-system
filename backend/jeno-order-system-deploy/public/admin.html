@@ -329,8 +329,12 @@
         <input type="text" id="productImage" placeholder="/images/chocolate-cake.png" oninput="showImagePreview(this.value.trim())">
       </div>
       <div>
-        <label for="productEmoji">Icon (emoji fallback)</label>
-        <input type="text" id="productEmoji" placeholder="🍰">
+        <label for="productEmoji">Icon</label>
+<select id="productEmoji">
+  <option value="🍰">🍰 Cake</option>
+  <option value="🌀">🌀 Cinnamon Roll</option>
+  <option value="🍮">🍮 Tiramisu</option>
+</select>
       </div>
     </div>
     <div class="form-row full">
@@ -744,7 +748,7 @@
     document.getElementById("cancelEditButton").style.display = "";
     document.getElementById("productCategory").value = product.category;
     document.getElementById("productName").value = product.name;
-    document.getElementById("productImage").value = product.image || "";
+    document.getElementById("productImage").value = product.image || "🍰";
     document.getElementById("productImageFile").value = "";
     showImagePreview(product.image || "");
     document.getElementById("productDescription").value = product.description || "";
