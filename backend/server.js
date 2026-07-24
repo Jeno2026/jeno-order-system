@@ -8,6 +8,7 @@ const fs = require("fs");
 const path = require("path");
 
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || "0.0.0.0";
 
 const PRODUCTS_FILE = path.join(__dirname, "data", "products.json");
 const ORDERS_FILE = path.join(__dirname, "data", "orders.json");
@@ -41,6 +42,10 @@ function readRequestBody(req) {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
+      if (body.length > 1024 * 1024) {
+        reject(new Error("Request body is too large"));
+        req.destroy();
+      }
     });
     req.on("end", () => {
       try {
@@ -73,6 +78,11 @@ const server = http.createServer(async (req, res) => {
   const pathname = url.pathname;
 
   try {
+    // 部署平台可用此端點確認服務仍正常運作
+    if (pathname === "/health" && req.method === "GET") {
+      return sendJson(res, 200, { status: "ok" });
+    }
+
     // --- API: 取得所有商品 ---
     if (pathname === "/api/products" && req.method === "GET") {
       const products = readJsonFile(PRODUCTS_FILE);
@@ -95,6 +105,10 @@ const server = http.createServer(async (req, res) => {
         name: body.name,
         price: Number(body.price),
         emoji: body.emoji || "🍽️",
+        description: body.description || "",
+        image: body.image || "",
+        optionType: body.optionType || "quantity",
+        options: Array.isArray(body.options) ? body.options : [],
       };
 
       products.push(newProduct);
@@ -122,6 +136,16 @@ const server = http.createServer(async (req, res) => {
         ...(body.category !== undefined && { category: body.category }),
         ...(body.price !== undefined && { price: Number(body.price) }),
         ...(body.emoji !== undefined && { emoji: body.emoji }),
+        ...(body.description !== undefined && { description: String(body.description) }),
+        ...(body.image !== undefined && { image: String(body.image) }),
+        ...(body.optionType !== undefined && { optionType: String(body.optionType) }),
+        ...(Array.isArray(body.options) && {
+          options: body.options.map((option) => ({
+            value: String(option.value),
+            label: String(option.label),
+            price: Number(option.price),
+          })),
+        }),
       };
 
       writeJsonFile(PRODUCTS_FILE, products);
@@ -176,10 +200,34 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, orders);
     }
 
-    // --- 靜態檔案:網頁本體(HTML/CSS/JS/圖片) ---
-    let filePath = path.join(PUBLIC_DIR, pathname === "/" ? "order-page.html" : pathname);
+    // --- API: 更新訂單狀態 ---
+    if (pathname.startsWith("/api/orders/") && req.method === "PATCH") {
+      const id = decodeURIComponent(pathname.split("/api/orders/")[1]);
+      const body = await readRequestBody(req);
+      const allowedStatuses = ["received", "preparing", "ready", "completed", "cancelled"];
 
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      if (!allowedStatuses.includes(body.status)) {
+        return sendJson(res, 400, { error: "Invalid order status." });
+      }
+
+      const orders = readJsonFile(ORDERS_FILE);
+      const order = orders.find((item) => item.id === id);
+
+      if (!order) {
+        return sendJson(res, 404, { error: "Order not found." });
+      }
+
+      order.status = body.status;
+      writeJsonFile(ORDERS_FILE, orders);
+      return sendJson(res, 200, { message: "Order updated", order });
+    }
+
+    // --- 靜態檔案:網頁本體(HTML/CSS/JS/圖片) ---
+    const relativePath = pathname === "/" ? "order-page.html" : pathname.replace(/^\/+/, "");
+    const filePath = path.resolve(PUBLIC_DIR, relativePath);
+    const isInsidePublicDir = filePath.startsWith(PUBLIC_DIR + path.sep);
+
+    if (isInsidePublicDir && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
       const content = fs.readFileSync(filePath);
       res.writeHead(200, { "Content-Type": getContentType(filePath) });
       return res.end(content);
@@ -195,6 +243,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`Server running at http://${HOST}:${PORT}`);
 });
