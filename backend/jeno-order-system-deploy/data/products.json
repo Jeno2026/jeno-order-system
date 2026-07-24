@@ -3,84 +3,160 @@
     "id": "item1",
     "category": "Cakes",
     "name": "Chocolate Cake",
-    "price": 6,
-    "emoji": "🍰"
+    "price": 35,
+    "emoji": "🍰",
+    "image": "/images/chocolate-cake.png",
+    "description": "A rich chocolate layer cake finished with silky dark chocolate ganache and delicate chocolate curls.",
+    "optionType": "size",
+    "options": [
+      { "value": "4in", "label": "4\"", "price": 35 },
+      { "value": "6in", "label": "6\"", "price": 50 },
+      { "value": "8in", "label": "8\"", "price": 70 }
+    ]
   },
   {
     "id": "item2",
     "category": "Cakes",
     "name": "Carrot Cake",
-    "price": 6.5,
-    "emoji": "🍰"
+    "price": 35,
+    "emoji": "🍰",
+    "image": "/images/carrot-cake.png",
+    "description": "Moist spiced carrot cake layered with smooth cream cheese frosting and finished with toasted walnuts.",
+    "optionType": "size",
+    "options": [
+      { "value": "4in", "label": "4\"", "price": 35 },
+      { "value": "6in", "label": "6\"", "price": 50 },
+      { "value": "8in", "label": "8\"", "price": 70 }
+    ]
   },
   {
     "id": "item3",
     "category": "Cakes",
     "name": "Red Velvet Cake",
-    "price": 6.5,
-    "emoji": "🍰"
+    "price": 35,
+    "emoji": "🍰",
+    "image": "/images/red-velvet-cake.png",
+    "description": "Classic red velvet layers with a tender crumb, tangy cream cheese frosting and a refined berry finish.",
+    "optionType": "size",
+    "options": [
+      { "value": "4in", "label": "4\"", "price": 35 },
+      { "value": "6in", "label": "6\"", "price": 50 },
+      { "value": "8in", "label": "8\"", "price": 70 }
+    ]
   },
   {
     "id": "item4",
     "category": "Cakes",
     "name": "Lemon Cake",
-    "price": 6,
-    "emoji": "🍰"
+    "price": 35,
+    "emoji": "🍰",
+    "image": "/images/lemon-cake.png",
+    "description": "Bright lemon cake layered with delicate lemon buttercream and finished with candied citrus.",
+    "optionType": "size",
+    "options": [
+      { "value": "4in", "label": "4\"", "price": 35 },
+      { "value": "6in", "label": "6\"", "price": 50 },
+      { "value": "8in", "label": "8\"", "price": 70 }
+    ]
   },
   {
     "id": "item5",
     "category": "Cinnamon Rolls",
     "name": "Classic Cinnamon Roll",
     "price": 5,
-    "emoji": "🌀"
+    "emoji": "🌀",
+    "image": "/images/classic-cinnamon-roll.png",
+    "description": "A soft, slow-risen cinnamon roll layered with fragrant cinnamon sugar and finished with a delicate vanilla glaze.",
+    "optionType": "pack",
+    "options": [
+      { "value": "single", "label": "1 roll", "price": 5 },
+      { "value": "dozen", "label": "Dozen (12)", "price": 60 }
+    ]
   },
   {
     "id": "item6",
     "category": "Cinnamon Rolls",
     "name": "Maple Pecan Roll",
     "price": 5.5,
-    "emoji": "🌀"
+    "emoji": "🌀",
+    "image": "/images/maple-pecan-roll.png",
+    "description": "Our tender cinnamon roll finished with amber maple glaze and toasted pecans for a warm, nutty crunch.",
+    "optionType": "pack",
+    "options": [
+      { "value": "single", "label": "1 roll", "price": 5.5 },
+      { "value": "dozen", "label": "Dozen (12)", "price": 66 }
+    ]
   },
   {
     "id": "item7",
     "category": "Cinnamon Rolls",
     "name": "Cream Cheese Roll",
     "price": 5.5,
-    "emoji": "🌀"
+    "emoji": "🌀",
+    "image": "/images/cream-cheese-roll.png",
+    "description": "A classic cinnamon spiral generously finished with smooth, tangy cream cheese frosting.",
+    "optionType": "pack",
+    "options": [
+      { "value": "single", "label": "1 roll", "price": 5.5 },
+      { "value": "dozen", "label": "Dozen (12)", "price": 66 }
+    ]
   },
   {
     "id": "item8",
     "category": "Cinnamon Rolls",
     "name": "Chocolate Swirl Roll",
     "price": 5.75,
-    "emoji": "🌀"
+    "emoji": "🌀",
+    "image": "/images/chocolate-swirl-roll.png",
+    "description": "A buttery cinnamon roll layered with rich chocolate filling and finished with a restrained chocolate drizzle.",
+    "optionType": "pack",
+    "options": [
+      { "value": "single", "label": "1 roll", "price": 5.75 },
+      { "value": "dozen", "label": "Dozen (12)", "price": 69 }
+    ]
   },
   {
     "id": "item9",
     "category": "Tiramisu",
     "name": "Classic Tiramisu",
     "price": 7,
-    "emoji": "🍮"
+    "emoji": "🍮",
+    "image": "/images/classic-tiramisu.png",
+    "description": "Classic espresso-soaked layers folded with airy mascarpone cream and finished with a fine dusting of cocoa.",
+    "optionType": "quantity",
+    "options": []
   },
   {
     "id": "item10",
     "category": "Tiramisu",
     "name": "Matcha Tiramisu",
     "price": 7.5,
-    "emoji": "🍮"
+    "emoji": "🍮",
+    "image": "/images/matcha-tiramisu.png",
+    "description": "Delicate matcha-soaked layers with smooth mascarpone cream and an aromatic Japanese green tea finish.",
+    "optionType": "quantity",
+    "options": []
   },
   {
     "id": "item11",
     "category": "Tiramisu",
     "name": "Strawberry Tiramisu",
     "price": 7.5,
-    "emoji": "🍮"
+    "emoji": "🍮",
+    "image": "/images/strawberry-tiramisu.png",
+    "description": "A bright strawberry variation layered with mascarpone cream, strawberry-soaked biscuits and fresh berries.",
+    "optionType": "quantity",
+    "options": []
   },
   {
     "id": "item12",
     "category": "Tiramisu",
     "name": "Espresso Tiramisu",
     "price": 7.25,
-    "emoji": "🍮"
+    "emoji": "🍮",
+    "image": "/images/espresso-tiramisu.png",
+    "description": "A deeper coffee-forward tiramisu with intense espresso-soaked layers, mascarpone and rich cocoa.",
+    "optionType": "quantity",
+    "options": []
   }
 ]

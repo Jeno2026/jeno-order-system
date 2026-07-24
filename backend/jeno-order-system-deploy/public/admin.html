@@ -412,7 +412,12 @@
         html += "<tr>";
         html += "<td>" + escapeHtml(p.emoji) + "</td>";
         html += "<td>" + escapeHtml(p.name) + "</td>";
-        html += "<td>$" + Number(p.price).toFixed(2) + "</td>";
+        const priceSummary = Array.isArray(p.options) && p.options.length
+          ? p.options.map((option) =>
+              escapeHtml(option.label) + " $" + Number(option.price).toFixed(2)
+            ).join("<br>")
+          : "$" + Number(p.price).toFixed(2);
+        html += "<td>" + priceSummary + "</td>";
         html += '<td class="actions">';
         html += '<button class="btn btn-primary btn-small" onclick="startEdit(\'' + p.id + '\')">Edit</button>';
         html += '<button class="btn btn-danger btn-small" onclick="deleteProduct(\'' + p.id + '\')">Delete</button>';
@@ -482,14 +487,41 @@
     const newName = prompt("Product name:", product.name);
     if (newName === null) return; // 使用者按取消
 
-    const newPrice = prompt("Price ($):", product.price);
+    const newCategory = prompt("Category:", product.category);
+    if (newCategory === null) return;
+
+    const newDescription = prompt("Product description:", product.description || "");
+    if (newDescription === null) return;
+
+    const newImage = prompt("Image path:", product.image || "");
+    if (newImage === null) return;
+
+    const newPrice = prompt("Base price ($):", product.price);
     if (newPrice === null) return;
+
+    const options = Array.isArray(product.options)
+      ? product.options.map((option) => ({ ...option }))
+      : [];
+
+    for (const option of options) {
+      const newOptionPrice = prompt(option.label + " price ($):", option.price);
+      if (newOptionPrice === null) return;
+      option.price = Number(newOptionPrice);
+    }
 
     try {
       const res = await fetch("/api/products/" + id, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName, price: newPrice }),
+        body: JSON.stringify({
+          name: newName,
+          category: newCategory,
+          description: newDescription,
+          image: newImage,
+          price: newPrice,
+          optionType: product.optionType || "quantity",
+          options,
+        }),
       });
 
       if (!res.ok) throw new Error("Request failed");

@@ -105,6 +105,10 @@ const server = http.createServer(async (req, res) => {
         name: body.name,
         price: Number(body.price),
         emoji: body.emoji || "🍽️",
+        description: body.description || "",
+        image: body.image || "",
+        optionType: body.optionType || "quantity",
+        options: Array.isArray(body.options) ? body.options : [],
       };
 
       products.push(newProduct);
@@ -132,6 +136,16 @@ const server = http.createServer(async (req, res) => {
         ...(body.category !== undefined && { category: body.category }),
         ...(body.price !== undefined && { price: Number(body.price) }),
         ...(body.emoji !== undefined && { emoji: body.emoji }),
+        ...(body.description !== undefined && { description: String(body.description) }),
+        ...(body.image !== undefined && { image: String(body.image) }),
+        ...(body.optionType !== undefined && { optionType: String(body.optionType) }),
+        ...(Array.isArray(body.options) && {
+          options: body.options.map((option) => ({
+            value: String(option.value),
+            label: String(option.label),
+            price: Number(option.price),
+          })),
+        }),
       };
 
       writeJsonFile(PRODUCTS_FILE, products);
