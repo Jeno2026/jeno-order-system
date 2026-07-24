@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JÉNO Admin - Manage Products</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f4f1ec;
+    color: #4a453d;
+  }
+  .admin-header {
+    background: #877d70;
+    color: white;
+    padding: 18px 24px;
+  }
+  .admin-header h1 {
+    margin: 0;
+    font-size: 20px;
+  }
+  .admin-header p {
+    margin: 4px 0 0 0;
+    font-size: 13px;
+    opacity: 0.85;
+  }
+  .admin-content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .panel {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .panel h2 {
+    font-size: 16px;
+    margin: 0 0 16px 0;
+  }
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .form-row.full {
+    grid-template-columns: 1fr;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    color: #877d70;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  input, select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d8d0c2;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .btn {
+    padding: 9px 18px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primary {
+    background: #877d70;
+    color: white;
+  }
+  .btn-primary:hover {
+    background: #6e6459;
+  }
+  .btn-danger {
+    background: #c0564d;
+    color: white;
+  }
+  .btn-danger:hover {
+    background: #a3453d;
+  }
+  .btn-small {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+  .category-group {
+    margin-bottom: 20px;
+  }
+  .category-group h3 {
+    font-size: 14px;
+    color: #877d70;
+    border-bottom: 1px solid #e6e0d6;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th {
+    text-align: left;
+    font-size: 12px;
+    color: #877d70;
+    padding: 6px 8px;
+    border-bottom: 1px solid #e6e0d6;
+  }
+  td {
+    padding: 8px;
+    font-size: 13px;
+    border-bottom: 1px solid #f0ece4;
+  }
+  td.actions {
+    text-align: right;
+    white-space: nowrap;
+  }
+  td.actions .btn {
+    margin-left: 6px;
+  }
+  .empty-msg {
+    color: #a49a8d;
+    font-size: 13px;
+    text-align: center;
+    padding: 20px 0;
+  }
+  .status-msg {
+    font-size: 13px;
+    margin-top: 8px;
+    display: none;
+  }
+  .status-msg.success {
+    color: #4a7a45;
+  }
+  .status-msg.error {
+    color: #c0564d;
+  }
+  .admin-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .tab-btn {
+    border: 1px solid #cfc7ba;
+    background: transparent;
+    color: #6e6459;
+  }
+  .tab-btn.active {
+    background: #877d70;
+    border-color: #877d70;
+    color: white;
+  }
+  .admin-view {
+    display: none;
+  }
+  .admin-view.active {
+    display: block;
+  }
+  .order-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .order-card {
+    border: 1px solid #e6e0d6;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .order-heading, .order-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+  }
+  .order-id {
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .order-time {
+    color: #877d70;
+    font-size: 12px;
+  }
+  .order-items {
+    margin: 12px 0;
+    padding: 10px 0;
+    border-top: 1px solid #f0ece4;
+    border-bottom: 1px solid #f0ece4;
+  }
+  .order-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    padding: 3px 0;
+  }
+  .order-total {
+    font-weight: 700;
+  }
+  .status-select {
+    width: auto;
+    min-width: 130px;
+  }
+  @media (max-width: 600px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+    .order-heading, .order-footer {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="admin-header">
+  <h1>JÉNO Pâtisserie &amp; Café — Admin</h1>
+  <p>Manage your menu items</p>
+</div>
+
+<div class="admin-content">
+
+  <div class="admin-tabs">
+    <button class="btn tab-btn active" id="ordersTab" onclick="showView('orders')">Orders</button>
+    <button class="btn tab-btn" id="productsTab" onclick="showView('products')">Products</button>
+  </div>
+
+  <div class="admin-view active" id="ordersView">
+    <div class="panel">
+      <div class="order-toolbar">
+        <h2>Orders</h2>
+        <button class="btn btn-primary btn-small" onclick="loadOrders()">Refresh</button>
+      </div>
+      <div id="orderListContainer">
+        <p class="empty-msg">Loading orders...</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-view" id="productsView">
+  <div class="panel">
+    <h2>Add a New Product</h2>
+    <div class="form-row">
+      <div>
+        <label for="newCategory">Category</label>
+        <input type="text" id="newCategory" placeholder="e.g. Cakes">
+      </div>
+      <div>
+        <label for="newName">Product Name</label>
+        <input type="text" id="newName" placeholder="e.g. Chocolate Cake">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label for="newPrice">Price ($)</label>
+        <input type="number" id="newPrice" step="0.01" placeholder="e.g. 6.00">
+      </div>
+      <div>
+        <label for="newEmoji">Icon (emoji placeholder)</label>
+        <input type="text" id="newEmoji" placeholder="🍰">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="addProduct()">Add Product</button>
+    <p class="status-msg" id="addStatusMsg"></p>
+  </div>
+
+  <div class="panel">
+    <h2>Current Menu</h2>
+    <div id="productListContainer">
+      <p class="empty-msg">Loading products...</p>
+    </div>
+  </div>
+  </div>
+
+</div>
+
+<script>
+  let allProducts = [];
+  let allOrders = [];
+  const orderStatuses = [
+    ["received", "Received"],
+    ["preparing", "Preparing"],
+    ["ready", "Ready"],
+    ["completed", "Completed"],
+    ["cancelled", "Cancelled"],
+  ];
+
+  function showView(view) {
+    document.getElementById("ordersView").classList.toggle("active", view === "orders");
+    document.getElementById("productsView").classList.toggle("active", view === "products");
+    document.getElementById("ordersTab").classList.toggle("active", view === "orders");
+    document.getElementById("productsTab").classList.toggle("active", view === "products");
+  }
+
+  async function loadOrders() {
+    const container = document.getElementById("orderListContainer");
+    container.innerHTML = '<p class="empty-msg">Loading orders...</p>';
+
+    try {
+      const res = await fetch("/api/orders");
+      if (!res.ok) throw new Error("Request failed");
+      allOrders = await res.json();
+      renderOrders();
+    } catch (err) {
+      container.innerHTML = '<p class="empty-msg">Could not load orders.</p>';
+    }
+  }
+
+  function renderOrders() {
+    const container = document.getElementById("orderListContainer");
+
+    if (allOrders.length === 0) {
+      container.innerHTML = '<p class="empty-msg">No orders yet.</p>';
+      return;
+    }
+
+    const sortedOrders = [...allOrders].sort((a, b) =>
+      new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    container.innerHTML = sortedOrders.map((order) => {
+      const items = Object.values(order.items || {}).map((item) => {
+        const qty = Number(item.qty) || 0;
+        const price = Number(item.price) || 0;
+        return '<div class="order-item"><span>' +
+          escapeHtml(item.name || "Item") + " × " + qty +
+          '</span><span>$' + (price * qty).toFixed(2) + "</span></div>";
+      }).join("");
+
+      const options = orderStatuses.map(([value, label]) =>
+        '<option value="' + value + '"' +
+        (order.status === value ? " selected" : "") + ">" + label + "</option>"
+      ).join("");
+
+      return '<article class="order-card">' +
+        '<div class="order-heading"><span class="order-id">' +
+        escapeHtml(order.id) + '</span><time class="order-time">' +
+        new Date(order.createdAt).toLocaleString() + "</time></div>" +
+        '<div class="order-items">' + items + "</div>" +
+        '<div class="order-footer"><span class="order-total">Total: $' +
+        Number(order.total || 0).toFixed(2) + '</span><select class="status-select" ' +
+        'aria-label="Order status" onchange="updateOrderStatus(\'' +
+        encodeURIComponent(order.id) + "', this)\">" + options + "</select></div></article>";
+    }).join("");
+  }
+
+  async function updateOrderStatus(encodedId, select) {
+    select.disabled = true;
+    try {
+      const res = await fetch("/api/orders/" + encodedId, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: select.value }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+      await loadOrders();
+    } catch (err) {
+      alert("Could not update order status.");
+      await loadOrders();
+    } finally {
+      select.disabled = false;
+    }
+  }
+
+  // ---------- 讀取商品清單 ----------
+  async function loadProducts() {
+    try {
+      const res = await fetch("/api/products");
+      allProducts = await res.json();
+      renderProductList();
+    } catch (err) {
+      document.getElementById("productListContainer").innerHTML =
+        '<p class="empty-msg">Could not load products. Is the server running?</p>';
+    }
+  }
+
+  // ---------- 依分類渲染商品清單 ----------
+  function renderProductList() {
+    const container = document.getElementById("productListContainer");
+
+    if (allProducts.length === 0) {
+      container.innerHTML = '<p class="empty-msg">No products yet.</p>';
+      return;
+    }
+
+    // 依 category 分組
+    const groups = {};
+    for (const p of allProducts) {
+      if (!groups[p.category]) groups[p.category] = [];
+      groups[p.category].push(p);
+    }
+
+    let html = "";
+    for (const category in groups) {
+      html += '<div class="category-group">';
+      html += "<h3>" + escapeHtml(category) + "</h3>";
+      html += "<table><thead><tr><th>Icon</th><th>Name</th><th>Price</th><th></th></tr></thead><tbody>";
+
+      for (const p of groups[category]) {
+        html += "<tr>";
+        html += "<td>" + escapeHtml(p.emoji) + "</td>";
+        html += "<td>" + escapeHtml(p.name) + "</td>";
+        html += "<td>$" + Number(p.price).toFixed(2) + "</td>";
+        html += '<td class="actions">';
+        html += '<button class="btn btn-primary btn-small" onclick="startEdit(\'' + p.id + '\')">Edit</button>';
+        html += '<button class="btn btn-danger btn-small" onclick="deleteProduct(\'' + p.id + '\')">Delete</button>';
+        html += "</td>";
+        html += "</tr>";
+      }
+
+      html += "</tbody></table></div>";
+    }
+
+    container.innerHTML = html;
+  }
+
+  // 避免商品名稱裡有特殊字元(例如 <script>)破壞頁面結構
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.innerText = str;
+    return div.innerHTML;
+  }
+
+  // ---------- 新增商品 ----------
+  async function addProduct() {
+    const category = document.getElementById("newCategory").value.trim();
+    const name = document.getElementById("newName").value.trim();
+    const price = document.getElementById("newPrice").value;
+    const emoji = document.getElementById("newEmoji").value.trim() || "🍽️";
+
+    if (!category || !name || !price) {
+      showAddStatus("Please fill in category, name, and price.", "error");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category, name, price, emoji }),
+      });
+
+      if (!res.ok) throw new Error("Request failed");
+
+      showAddStatus("Product added!", "success");
+      document.getElementById("newCategory").value = "";
+      document.getElementById("newName").value = "";
+      document.getElementById("newPrice").value = "";
+      document.getElementById("newEmoji").value = "";
+
+      loadProducts();
+    } catch (err) {
+      showAddStatus("Something went wrong. Please try again.", "error");
+    }
+  }
+
+  function showAddStatus(message, type) {
+    const el = document.getElementById("addStatusMsg");
+    el.innerText = message;
+    el.className = "status-msg " + type;
+    el.style.display = "block";
+    setTimeout(() => { el.style.display = "none"; }, 2500);
+  }
+
+  // ---------- 編輯商品(用簡單的提示框輸入新值) ----------
+  async function startEdit(id) {
+    const product = allProducts.find((p) => p.id === id);
+    if (!product) return;
+
+    const newName = prompt("Product name:", product.name);
+    if (newName === null) return; // 使用者按取消
+
+    const newPrice = prompt("Price ($):", product.price);
+    if (newPrice === null) return;
+
+    try {
+      const res = await fetch("/api/products/" + id, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName, price: newPrice }),
+      });
+
+      if (!res.ok) throw new Error("Request failed");
+
+      loadProducts();
+    } catch (err) {
+      alert("Could not update product. Please try again.");
+    }
+  }
+
+  // ---------- 刪除商品 ----------
+  async function deleteProduct(id) {
+    const product = allProducts.find((p) => p.id === id);
+    if (!product) return;
+
+    const confirmed = confirm('Delete "' + product.name + '"? This cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch("/api/products/" + id, { method: "DELETE" });
+      if (!res.ok) throw new Error("Request failed");
+      loadProducts();
+    } catch (err) {
+      alert("Could not delete product. Please try again.");
+    }
+  }
+
+  loadOrders();
+  loadProducts();
+</script>
+
+</body>
+</html>
