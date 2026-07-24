@@ -1,0 +1,86 @@
+[
+  {
+    "id": "item1",
+    "category": "Cakes",
+    "name": "Chocolate Cake",
+    "price": 6,
+    "emoji": "🍰"
+  },
+  {
+    "id": "item2",
+    "category": "Cakes",
+    "name": "Carrot Cake",
+    "price": 6.5,
+    "emoji": "🍰"
+  },
+  {
+    "id": "item3",
+    "category": "Cakes",
+    "name": "Red Velvet Cake",
+    "price": 6.5,
+    "emoji": "🍰"
+  },
+  {
+    "id": "item4",
+    "category": "Cakes",
+    "name": "Lemon Cake",
+    "price": 6,
+    "emoji": "🍰"
+  },
+  {
+    "id": "item5",
+    "category": "Cinnamon Rolls",
+    "name": "Classic Cinnamon Roll",
+    "price": 5,
+    "emoji": "🌀"
+  },
+  {
+    "id": "item6",
+    "category": "Cinnamon Rolls",
+    "name": "Maple Pecan Roll",
+    "price": 5.5,
+    "emoji": "🌀"
+  },
+  {
+    "id": "item7",
+    "category": "Cinnamon Rolls",
+    "name": "Cream Cheese Roll",
+    "price": 5.5,
+    "emoji": "🌀"
+  },
+  {
+    "id": "item8",
+    "category": "Cinnamon Rolls",
+    "name": "Chocolate Swirl Roll",
+    "price": 5.75,
+    "emoji": "🌀"
+  },
+  {
+    "id": "item9",
+    "category": "Tiramisu",
+    "name": "Classic Tiramisu",
+    "price": 7,
+    "emoji": "🍮"
+  },
+  {
+    "id": "item10",
+    "category": "Tiramisu",
+    "name": "Matcha Tiramisu",
+    "price": 7.5,
+    "emoji": "🍮"
+  },
+  {
+    "id": "item11",
+    "category": "Tiramisu",
+    "name": "Strawberry Tiramisu",
+    "price": 7.5,
+    "emoji": "🍮"
+  },
+  {
+    "id": "item12",
+    "category": "Tiramisu",
+    "name": "Espresso Tiramisu",
+    "price": 7.25,
+    "emoji": "🍮"
+  }
+]
