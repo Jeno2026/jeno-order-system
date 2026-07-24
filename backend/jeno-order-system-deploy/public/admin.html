@@ -212,6 +212,39 @@
     width: auto;
     min-width: 130px;
   }
+  .variant-header, .variant-row, .form-actions {
+    display: flex;
+    align-items: end;
+    gap: 10px;
+  }
+  .variant-header {
+    justify-content: space-between;
+    align-items: center;
+    margin: 18px 0 10px;
+  }
+  .variant-header h3 {
+    margin: 0;
+    font-size: 14px;
+  }
+  .variant-row {
+    margin-bottom: 10px;
+  }
+  .variant-row > div:first-child {
+    flex: 2;
+  }
+  .variant-row > div:nth-child(2) {
+    flex: 1;
+  }
+  .variant-remove {
+    flex: 0 0 auto;
+  }
+  .form-actions {
+    margin-top: 18px;
+  }
+  .btn-secondary {
+    background: #e6e0d6;
+    color: #4a453d;
+  }
   @media (max-width: 600px) {
     .form-row {
       grid-template-columns: 1fr;
@@ -250,29 +283,49 @@
   </div>
 
   <div class="admin-view" id="productsView">
-  <div class="panel">
-    <h2>Add a New Product</h2>
+  <div class="panel" id="productFormPanel">
+    <h2 id="productFormTitle">Add a New Product</h2>
     <div class="form-row">
       <div>
-        <label for="newCategory">Category</label>
-        <input type="text" id="newCategory" placeholder="e.g. Cakes">
+        <label for="productCategory">Category</label>
+        <select id="productCategory" onchange="handleCategoryChange()">
+          <option value="Cakes">Cakes</option>
+          <option value="Cinnamon Rolls">Cinnamon Rolls</option>
+          <option value="Tiramisu">Tiramisu</option>
+        </select>
       </div>
       <div>
-        <label for="newName">Product Name</label>
-        <input type="text" id="newName" placeholder="e.g. Chocolate Cake">
+        <label for="productName">Product Name</label>
+        <input type="text" id="productName" placeholder="e.g. Chocolate Cake">
       </div>
     </div>
     <div class="form-row">
       <div>
-        <label for="newPrice">Price ($)</label>
-        <input type="number" id="newPrice" step="0.01" placeholder="e.g. 6.00">
+        <label for="productImage">Image path</label>
+        <input type="text" id="productImage" placeholder="/images/chocolate-cake.png">
       </div>
       <div>
-        <label for="newEmoji">Icon (emoji placeholder)</label>
-        <input type="text" id="newEmoji" placeholder="🍰">
+        <label for="productEmoji">Icon (emoji fallback)</label>
+        <input type="text" id="productEmoji" placeholder="🍰">
       </div>
     </div>
-    <button class="btn btn-primary" onclick="addProduct()">Add Product</button>
+    <div class="form-row full">
+      <div>
+        <label for="productDescription">Product description</label>
+        <input type="text" id="productDescription" placeholder="Describe this product">
+      </div>
+    </div>
+
+    <div class="variant-header">
+      <h3>Subcategories and prices</h3>
+      <button class="btn btn-secondary btn-small" type="button" onclick="addVariantRow()">+ Add subcategory</button>
+    </div>
+    <div id="variantRows"></div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" id="saveProductButton" onclick="saveProduct()">Add Product</button>
+      <button class="btn btn-secondary" id="cancelEditButton" onclick="resetProductForm()" style="display:none;">Cancel edit</button>
+    </div>
     <p class="status-msg" id="addStatusMsg"></p>
   </div>
 
@@ -289,6 +342,7 @@
 <script>
   let allProducts = [];
   let allOrders = [];
+  let editingProductId = null;
   const orderStatuses = [
     ["received", "Received"],
     ["preparing", "Preparing"],
@@ -438,34 +492,147 @@
     return div.innerHTML;
   }
 
-  // ---------- 新增商品 ----------
-  async function addProduct() {
-    const category = document.getElementById("newCategory").value.trim();
-    const name = document.getElementById("newName").value.trim();
-    const price = document.getElementById("newPrice").value;
-    const emoji = document.getElementById("newEmoji").value.trim() || "🍽️";
+  function categoryDefaults(category) {
+    if (category === "Cakes") {
+      return [
+        { label: '4"', price: "" },
+        { label: '6"', price: "" },
+        { label: '8"', price: "" },
+      ];
+    }
+    if (category === "Cinnamon Rolls") {
+      return [
+        { label: "1 roll", price: "" },
+        { label: "Dozen (12)", price: "" },
+      ];
+    }
+    return [{ label: "Individual", price: "" }];
+  }
 
-    if (!category || !name || !price) {
-      showAddStatus("Please fill in category, name, and price.", "error");
+  function renderVariantRows(options) {
+    const rows = options && options.length
+      ? options
+      : categoryDefaults(document.getElementById("productCategory").value);
+    document.getElementById("variantRows").innerHTML = rows.map((option) =>
+      '<div class="variant-row">' +
+        '<div><label>Subcategory</label><input class="variant-label" type="text" ' +
+        'placeholder="e.g. 4&quot;" value="' + escapeAttr(option.label || "") + '"></div>' +
+        '<div><label>Price ($)</label><input class="variant-price" type="number" ' +
+        'min="0" step="0.01" value="' +
+        (option.price === "" ? "" : Number(option.price)) + '"></div>' +
+        '<button class="btn btn-danger btn-small variant-remove" type="button" ' +
+        'onclick="removeVariantRow(this)">Remove</button>' +
+      "</div>"
+    ).join("");
+  }
+
+  function addVariantRow() {
+    const wrapper = document.createElement("div");
+    wrapper.className = "variant-row";
+    wrapper.innerHTML =
+      '<div><label>Subcategory</label><input class="variant-label" type="text" placeholder="e.g. 4&quot;"></div>' +
+      '<div><label>Price ($)</label><input class="variant-price" type="number" min="0" step="0.01"></div>' +
+      '<button class="btn btn-danger btn-small variant-remove" type="button" onclick="removeVariantRow(this)">Remove</button>';
+    document.getElementById("variantRows").appendChild(wrapper);
+  }
+
+  function removeVariantRow(button) {
+    const rows = document.querySelectorAll(".variant-row");
+    if (rows.length === 1) {
+      showAddStatus("At least one subcategory is required.", "error");
+      return;
+    }
+    button.closest(".variant-row").remove();
+  }
+
+  function handleCategoryChange() {
+    renderVariantRows(categoryDefaults(document.getElementById("productCategory").value));
+  }
+
+  function getFormOptions() {
+    const rows = [...document.querySelectorAll(".variant-row")];
+    return rows.map((row, index) => {
+      const label = row.querySelector(".variant-label").value.trim();
+      const price = Number(row.querySelector(".variant-price").value);
+      return {
+        value: slugOption(label, index),
+        label,
+        price,
+      };
+    });
+  }
+
+  function slugOption(label, index) {
+    const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    return slug || "option-" + (index + 1);
+  }
+
+  function escapeAttr(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function optionTypeForCategory(category) {
+    if (category === "Cakes") return "size";
+    if (category === "Cinnamon Rolls") return "pack";
+    return "quantity";
+  }
+
+  function emojiForCategory(category) {
+    if (category === "Cakes") return "🍰";
+    if (category === "Cinnamon Rolls") return "🌀";
+    if (category === "Tiramisu") return "🍮";
+    return "🍽️";
+  }
+
+  async function saveProduct() {
+    const category = document.getElementById("productCategory").value;
+    const name = document.getElementById("productName").value.trim();
+    const image = document.getElementById("productImage").value.trim();
+    const description = document.getElementById("productDescription").value.trim();
+    const emoji = document.getElementById("productEmoji").value.trim() || emojiForCategory(category);
+    const options = getFormOptions();
+
+    if (!name) {
+      showAddStatus("Please enter a product name.", "error");
+      return;
+    }
+    if (options.some((option) => !option.label || !Number.isFinite(option.price) || option.price < 0)) {
+      showAddStatus("Every subcategory needs a name and valid price.", "error");
       return;
     }
 
-    try {
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, name, price, emoji }),
-      });
+    const payload = {
+      category,
+      name,
+      image,
+      description,
+      emoji,
+      price: options[0].price,
+      optionType: optionTypeForCategory(category),
+      options: category === "Tiramisu" && options.length === 1
+        ? []
+        : options,
+    };
 
+    const url = editingProductId
+      ? "/api/products/" + editingProductId
+      : "/api/products";
+
+    try {
+      const res = await fetch(url, {
+        method: editingProductId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       if (!res.ok) throw new Error("Request failed");
 
-      showAddStatus("Product added!", "success");
-      document.getElementById("newCategory").value = "";
-      document.getElementById("newName").value = "";
-      document.getElementById("newPrice").value = "";
-      document.getElementById("newEmoji").value = "";
-
-      loadProducts();
+      showAddStatus(editingProductId ? "Product updated!" : "Product added!", "success");
+      resetProductForm();
+      await loadProducts();
     } catch (err) {
       showAddStatus("Something went wrong. Please try again.", "error");
     }
@@ -479,57 +646,39 @@
     setTimeout(() => { el.style.display = "none"; }, 2500);
   }
 
-  // ---------- 編輯商品(用簡單的提示框輸入新值) ----------
-  async function startEdit(id) {
+  // ---------- 把商品資料帶回完整表單編輯 ----------
+  function startEdit(id) {
     const product = allProducts.find((p) => p.id === id);
     if (!product) return;
 
-    const newName = prompt("Product name:", product.name);
-    if (newName === null) return; // 使用者按取消
+    editingProductId = id;
+    document.getElementById("productFormTitle").innerText = "Edit Product";
+    document.getElementById("saveProductButton").innerText = "Save Changes";
+    document.getElementById("cancelEditButton").style.display = "";
+    document.getElementById("productCategory").value = product.category;
+    document.getElementById("productName").value = product.name;
+    document.getElementById("productImage").value = product.image || "";
+    document.getElementById("productDescription").value = product.description || "";
+    document.getElementById("productEmoji").value = product.emoji || "";
+    renderVariantRows(
+      Array.isArray(product.options) && product.options.length
+        ? product.options
+        : [{ label: "Individual", price: product.price }]
+    );
+    document.getElementById("productFormPanel").scrollIntoView({ behavior: "smooth" });
+  }
 
-    const newCategory = prompt("Category:", product.category);
-    if (newCategory === null) return;
-
-    const newDescription = prompt("Product description:", product.description || "");
-    if (newDescription === null) return;
-
-    const newImage = prompt("Image path:", product.image || "");
-    if (newImage === null) return;
-
-    const newPrice = prompt("Base price ($):", product.price);
-    if (newPrice === null) return;
-
-    const options = Array.isArray(product.options)
-      ? product.options.map((option) => ({ ...option }))
-      : [];
-
-    for (const option of options) {
-      const newOptionPrice = prompt(option.label + " price ($):", option.price);
-      if (newOptionPrice === null) return;
-      option.price = Number(newOptionPrice);
-    }
-
-    try {
-      const res = await fetch("/api/products/" + id, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newName,
-          category: newCategory,
-          description: newDescription,
-          image: newImage,
-          price: newPrice,
-          optionType: product.optionType || "quantity",
-          options,
-        }),
-      });
-
-      if (!res.ok) throw new Error("Request failed");
-
-      loadProducts();
-    } catch (err) {
-      alert("Could not update product. Please try again.");
-    }
+  function resetProductForm() {
+    editingProductId = null;
+    document.getElementById("productFormTitle").innerText = "Add a New Product";
+    document.getElementById("saveProductButton").innerText = "Add Product";
+    document.getElementById("cancelEditButton").style.display = "none";
+    document.getElementById("productCategory").value = "Cakes";
+    document.getElementById("productName").value = "";
+    document.getElementById("productImage").value = "";
+    document.getElementById("productDescription").value = "";
+    document.getElementById("productEmoji").value = "";
+    renderVariantRows(categoryDefaults("Cakes"));
   }
 
   // ---------- 刪除商品 ----------
@@ -551,6 +700,7 @@
 
   loadOrders();
   loadProducts();
+  resetProductForm();
 </script>
 
 </body>
