@@ -1,0 +1,14 @@
+{
+  "name": "jeno-order-system-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "JÉNO Pâtisserie & Café ordering system",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

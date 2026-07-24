@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: jeno-order-system
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
