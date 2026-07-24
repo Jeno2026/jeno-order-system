@@ -367,6 +367,136 @@
   .card.added .card-body {
     background: #eef3ed;
   }
+  .product-detail {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(45, 41, 36, 0.55);
+    overflow-y: auto;
+    padding: 20px;
+  }
+  .product-detail.open {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .product-detail-panel {
+    position: relative;
+    width: min(920px, 100%);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    background: #f8f5ef;
+    border-radius: 16px;
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    box-shadow: 0 24px 70px rgba(0,0,0,0.3);
+  }
+  .product-detail-image {
+    width: 100%;
+    height: 100%;
+    min-height: 520px;
+    object-fit: cover;
+    border-radius: 16px 0 0 16px;
+  }
+  .product-detail-content {
+    padding: 44px 34px 34px;
+    display: flex;
+    flex-direction: column;
+  }
+  .product-detail-close {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.9);
+    color: #4a453d;
+    font-size: 25px;
+    cursor: pointer;
+  }
+  .product-detail-kicker {
+    color: #877d70;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: 0 0 8px;
+  }
+  .product-detail-title {
+    color: #4a453d;
+    font-size: 30px;
+    line-height: 1.15;
+    margin: 0 0 14px;
+  }
+  .product-detail-description {
+    color: #6e6459;
+    font-size: 14px;
+    line-height: 1.7;
+    margin: 0 0 26px;
+  }
+  .size-label {
+    color: #4a453d;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .size-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .size-option {
+    padding: 12px 8px;
+    border: 1px solid #d8d0c2;
+    border-radius: 8px;
+    background: white;
+    color: #4a453d;
+    cursor: pointer;
+    text-align: center;
+  }
+  .size-option.selected {
+    color: white;
+    background: #877d70;
+    border-color: #877d70;
+  }
+  .detail-add-btn {
+    margin-top: auto;
+    width: 100%;
+    padding: 13px;
+    border: 0;
+    border-radius: 8px;
+    background: #877d70;
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .detail-add-btn:hover {
+    background: #6e6459;
+  }
+  @media (max-width: 700px) {
+    .product-detail {
+      padding: 0;
+    }
+    .product-detail-panel {
+      min-height: 100vh;
+      max-height: none;
+      border-radius: 0;
+      grid-template-columns: 1fr;
+    }
+    .product-detail-image {
+      min-height: 0;
+      height: 42vh;
+      border-radius: 0;
+    }
+    .product-detail-content {
+      padding: 28px 20px;
+    }
+  }
   .footer {
     background: #877d70;
     color: #f2ede4;
@@ -472,6 +602,21 @@
 </div>
 </div>
 
+<div class="product-detail" id="productDetail" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+  <div class="product-detail-panel">
+    <button class="product-detail-close" onclick="closeProductDetail()" aria-label="Close">&times;</button>
+    <img class="product-detail-image" id="detailImage" alt="">
+    <div class="product-detail-content">
+      <p class="product-detail-kicker">Made to order</p>
+      <h2 class="product-detail-title" id="detailTitle"></h2>
+      <p class="product-detail-description" id="detailDescription"></p>
+      <div class="size-label">Choose a size</div>
+      <div class="size-options" id="sizeOptions"></div>
+      <button class="detail-add-btn" id="detailAddButton" onclick="addConfiguredCake()">Add to cart — $35.00</button>
+    </div>
+  </div>
+</div>
+
 
 <div class="footer">
   <div class="footer-inner">
@@ -545,6 +690,31 @@
   // Cart is stored as an object: { itemId: { name, price, qty } }
   let cart = {};
   let allProducts = []; // Cache of products loaded from the server
+  let activeCake = null;
+  let selectedCakeSize = '4"';
+  const cakeSizes = [
+    { label: '4"', price: 35 },
+    { label: '6"', price: 50 },
+    { label: '8"', price: 70 },
+  ];
+  const cakeDetails = {
+    item1: {
+      image: "/images/chocolate-cake.png",
+      description: "A rich chocolate layer cake finished with silky dark chocolate ganache and delicate chocolate curls."
+    },
+    item2: {
+      image: "/images/carrot-cake.png",
+      description: "Moist spiced carrot cake layered with smooth cream cheese frosting and finished with toasted walnuts."
+    },
+    item3: {
+      image: "/images/red-velvet-cake.png",
+      description: "Classic red velvet layers with a tender crumb, tangy cream cheese frosting and a refined berry finish."
+    },
+    item4: {
+      image: "/images/lemon-cake.png",
+      description: "Bright lemon cake layered with delicate lemon buttercream and finished with candied citrus."
+    },
+  };
 
   // ---------- Load the menu from the backend ----------
   async function loadMenu() {
@@ -596,12 +766,20 @@
 
       for (const p of groups[category]) {
         const cardId = "card_" + p.id;
-        html += '<div class="card" id="' + cardId + '" onclick="addToCart(\'' + p.id + '\', \'' +
-                escapeHtml(p.name).replace(/'/g, "\\'") + '\', ' + p.price + ', \'' + cardId + '\')">';
-        html += '<div class="card-img">' + p.emoji + "</div>";
+        const isCake = Boolean(cakeDetails[p.id]);
+        const action = isCake
+          ? "openProductDetail('" + p.id + "')"
+          : "addToCart('" + p.id + "', '" +
+            escapeHtml(p.name).replace(/'/g, "\\'") + "', " + p.price + ", '" + cardId + "')";
+        html += '<div class="card" id="' + cardId + '" onclick="' + action + '">';
+        html += '<div class="card-img">' +
+          (isCake
+            ? '<img src="' + cakeDetails[p.id].image + '" alt="' + escapeHtml(p.name) + '">'
+            : p.emoji) + "</div>";
         html += '<div class="card-body">';
         html += '<p class="card-name">' + escapeHtml(p.name) + "</p>";
-        html += '<p class="card-price">$' + Number(p.price).toFixed(2) + "</p>";
+        html += '<p class="card-price">' +
+          (isCake ? "From $35.00" : "$" + Number(p.price).toFixed(2)) + "</p>";
         html += "</div></div>";
       }
 
@@ -621,6 +799,64 @@
     positionCategoryNav();
   });
   window.addEventListener("resize", positionCategoryNav);
+
+  function openProductDetail(productId) {
+    const product = allProducts.find((item) => item.id === productId);
+    const detail = cakeDetails[productId];
+    if (!product || !detail) return;
+
+    activeCake = product;
+    selectedCakeSize = '4"';
+    document.getElementById("detailTitle").innerText = product.name;
+    document.getElementById("detailDescription").innerText = detail.description;
+    document.getElementById("detailImage").src = detail.image;
+    document.getElementById("detailImage").alt = product.name;
+    renderSizeOptions();
+    document.getElementById("productDetail").classList.add("open");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeProductDetail() {
+    document.getElementById("productDetail").classList.remove("open");
+    document.body.style.overflow = "";
+  }
+
+  function renderSizeOptions() {
+    document.getElementById("sizeOptions").innerHTML = cakeSizes.map((size, index) =>
+      '<button class="size-option' + (size.label === selectedCakeSize ? " selected" : "") +
+      '" onclick="selectCakeSize(' + index + ')">' +
+      size.label + "<br>$" + size.price.toFixed(2) + "</button>"
+    ).join("");
+    const selected = cakeSizes.find((size) => size.label === selectedCakeSize);
+    document.getElementById("detailAddButton").innerText =
+      "Add to cart — $" + selected.price.toFixed(2);
+  }
+
+  function selectCakeSize(sizeIndex) {
+    selectedCakeSize = cakeSizes[sizeIndex].label;
+    renderSizeOptions();
+  }
+
+  function addConfiguredCake() {
+    if (!activeCake) return;
+    const selected = cakeSizes.find((size) => size.label === selectedCakeSize);
+    const cartId = activeCake.id + "_" + selectedCakeSize.replace('"', "in");
+    addToCart(
+      cartId,
+      activeCake.name + " — " + selectedCakeSize,
+      selected.price,
+      "card_" + activeCake.id
+    );
+    closeProductDetail();
+  }
+
+  document.getElementById("productDetail").addEventListener("click", function(event) {
+    if (event.target === this) closeProductDetail();
+  });
+
+  document.addEventListener("keydown", function(event) {
+    if (event.key === "Escape") closeProductDetail();
+  });
 
   // ---------- Cart interactions ----------
   function addToCart(id, name, price, cardId) {
