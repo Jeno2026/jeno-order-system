@@ -186,6 +186,28 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, orders);
     }
 
+    // --- API: 更新訂單狀態 ---
+    if (pathname.startsWith("/api/orders/") && req.method === "PATCH") {
+      const id = decodeURIComponent(pathname.split("/api/orders/")[1]);
+      const body = await readRequestBody(req);
+      const allowedStatuses = ["received", "preparing", "ready", "completed", "cancelled"];
+
+      if (!allowedStatuses.includes(body.status)) {
+        return sendJson(res, 400, { error: "Invalid order status." });
+      }
+
+      const orders = readJsonFile(ORDERS_FILE);
+      const order = orders.find((item) => item.id === id);
+
+      if (!order) {
+        return sendJson(res, 404, { error: "Order not found." });
+      }
+
+      order.status = body.status;
+      writeJsonFile(ORDERS_FILE, orders);
+      return sendJson(res, 200, { message: "Order updated", order });
+    }
+
     // --- 靜態檔案:網頁本體(HTML/CSS/JS/圖片) ---
     const relativePath = pathname === "/" ? "order-page.html" : pathname.replace(/^\/+/, "");
     const filePath = path.resolve(PUBLIC_DIR, relativePath);
