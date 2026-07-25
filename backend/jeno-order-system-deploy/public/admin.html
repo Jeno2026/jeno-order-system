@@ -323,18 +323,10 @@
         <input type="text" id="productName" placeholder="e.g. Chocolate Cake">
       </div>
     </div>
-    <div class="form-row">
+    <div class="form-row full">
       <div>
         <label for="productImage">Image path</label>
         <input type="text" id="productImage" placeholder="/images/chocolate-cake.png" oninput="showImagePreview(this.value.trim())">
-      </div>
-      <div>
-        <label for="productEmoji">Icon</label>
-<select id="productEmoji">
-  <option value="🍰">🍰 Cake</option>
-  <option value="🌀">🌀 Cinnamon Roll</option>
-  <option value="🍮">🍮 Tiramisu</option>
-</select>
       </div>
     </div>
     <div class="form-row full">
@@ -684,7 +676,12 @@
     const name = document.getElementById("productName").value.trim();
     const image = document.getElementById("productImage").value.trim();
     const description = document.getElementById("productDescription").value.trim();
-    const emoji = document.getElementById("productEmoji").value.trim() || emojiForCategory(category);
+    const existingProduct = editingProductId
+      ? allProducts.find((product) => product.id === editingProductId)
+      : null;
+    const emoji = existingProduct && existingProduct.category === category
+      ? existingProduct.emoji
+      : emojiForCategory(category);
     const options = getFormOptions();
 
     if (!name) {
@@ -748,11 +745,10 @@
     document.getElementById("cancelEditButton").style.display = "";
     document.getElementById("productCategory").value = product.category;
     document.getElementById("productName").value = product.name;
-    document.getElementById("productImage").value = product.image || "🍰";
+    document.getElementById("productImage").value = product.image || "";
     document.getElementById("productImageFile").value = "";
     showImagePreview(product.image || "");
     document.getElementById("productDescription").value = product.description || "";
-    document.getElementById("productEmoji").value = product.emoji || "";
     renderVariantRows(
       Array.isArray(product.options) && product.options.length
         ? product.options
@@ -772,7 +768,6 @@
     document.getElementById("productImageFile").value = "";
     showImagePreview("");
     document.getElementById("productDescription").value = "";
-    document.getElementById("productEmoji").value = "";
     renderVariantRows(categoryDefaults("Cakes"));
   }
 
