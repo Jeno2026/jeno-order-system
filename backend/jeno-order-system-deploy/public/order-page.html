@@ -399,6 +399,15 @@
     object-fit: cover;
     border-radius: 16px 0 0 16px;
   }
+  .product-detail-emoji {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    min-height: 520px;
+    border-radius: 16px 0 0 16px;
+    background: #d8d0c2;
+    font-size: 80px;
+  }
   .product-detail-content {
     padding: 44px 34px 34px;
     display: flex;
@@ -526,6 +535,11 @@
       height: 42vh;
       border-radius: 0;
     }
+    .product-detail-emoji {
+      min-height: 0;
+      height: 42vh;
+      border-radius: 0;
+    }
     .product-detail-content {
       padding: 28px 20px;
     }
@@ -639,6 +653,7 @@
   <div class="product-detail-panel">
     <button class="product-detail-close" onclick="closeProductDetail()" aria-label="Close">&times;</button>
     <img class="product-detail-image" id="detailImage" alt="">
+    <div class="product-detail-emoji" id="detailEmoji" aria-hidden="true"></div>
     <div class="product-detail-content">
       <p class="product-detail-kicker">Made to order</p>
       <h2 class="product-detail-title" id="detailTitle"></h2>
@@ -797,9 +812,14 @@
   };
 
   function getProductDetail(product) {
-    if (product.image || product.description) {
+    if (
+      product.image ||
+      product.description ||
+      product.optionType ||
+      (Array.isArray(product.options) && product.options.length)
+    ) {
       return {
-        image: product.image,
+        image: product.image || "",
         description: product.description || "",
       };
     }
@@ -865,7 +885,9 @@
         html += '<div class="card" id="' + cardId + '" onclick="' + action + '">';
         html += '<div class="card-img">' +
           (hasDetail
-            ? '<img src="' + detail.image + '" alt="' + escapeHtml(p.name) + '">'
+            ? detail.image
+              ? '<img src="' + detail.image + '" alt="' + escapeHtml(p.name) + '">'
+              : escapeHtml(p.emoji || "🍽️")
             : p.emoji) + "</div>";
         html += '<div class="card-body">';
         html += '<p class="card-name">' + escapeHtml(p.name) + "</p>";
@@ -913,9 +935,22 @@
       : "single";
     detailQuantity = 1;
     document.getElementById("detailTitle").innerText = product.name;
-    document.getElementById("detailDescription").innerText = detail.description;
-    document.getElementById("detailImage").src = detail.image;
-    document.getElementById("detailImage").alt = product.name;
+    document.getElementById("detailDescription").innerText =
+      detail.description || "Choose an option and quantity to add this item to your cart.";
+    const detailImage = document.getElementById("detailImage");
+    const detailEmoji = document.getElementById("detailEmoji");
+    if (detail.image) {
+      detailImage.src = detail.image;
+      detailImage.alt = product.name;
+      detailImage.style.display = "block";
+      detailEmoji.style.display = "none";
+    } else {
+      detailImage.removeAttribute("src");
+      detailImage.alt = "";
+      detailImage.style.display = "none";
+      detailEmoji.innerText = product.emoji || "🍽️";
+      detailEmoji.style.display = "flex";
+    }
     renderProductOptions();
     document.getElementById("productDetail").classList.add("open");
     document.body.style.overflow = "hidden";
