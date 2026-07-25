@@ -217,15 +217,28 @@ const server = http.createServer(async (req, res) => {
       if (!body.items || Object.keys(body.items).length === 0) {
         return sendJson(res, 400, { error: "Order must contain at least one item." });
       }
+      if (!body.customer || !body.customer.name || !body.customer.phone || !body.customer.email) {
+        return sendJson(res, 400, { error: "Customer name, phone, and email are required." });
+      }
+      if (!body.fulfillment || !body.fulfillment.method || !body.fulfillment.date) {
+        return sendJson(res, 400, { error: "Fulfillment method and date are required." });
+      }
+      if (body.fulfillment.method === "delivery" && !body.fulfillment.address) {
+        return sendJson(res, 400, { error: "Delivery address is required." });
+      }
 
       const orders = readJsonFile(ORDERS_FILE);
 
       const newOrder = {
-        id: "order_" + Date.now(), // 用時間戳記當簡單的訂單編號
+        id: "JENO-" + Date.now(),
         items: body.items,
-        total: body.total,
+        total: Number(body.total) || 0,
+        customer: body.customer,
+        fulfillment: body.fulfillment,
+        paymentMethod: "etransfer",
+        payment: null,
         createdAt: new Date().toISOString(),
-        status: "received",
+        status: "awaiting_transfer",
       };
 
       orders.push(newOrder);
@@ -240,11 +253,51 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, orders);
     }
 
+    // --- API: 顧客提交 e-Transfer 資料 ---
+    if (/^\/api\/orders\/[^/]+\/payment$/.test(pathname) && req.method === "PATCH") {
+      const id = decodeURIComponent(pathname.split("/")[3]);
+      const body = await readRequestBody(req);
+      const transfer = body.transfer || {};
+
+      if (!transfer.senderName || !transfer.senderEmail || !transfer.date ||
+          !transfer.reference || !Number.isFinite(Number(transfer.amount)) ||
+          Number(transfer.amount) <= 0) {
+        return sendJson(res, 400, { error: "Complete transfer information is required." });
+      }
+
+      const orders = readJsonFile(ORDERS_FILE);
+      const order = orders.find((item) => item.id === id);
+
+      if (!order) {
+        return sendJson(res, 404, { error: "Order not found." });
+      }
+
+      order.payment = {
+        senderName: String(transfer.senderName),
+        senderEmail: String(transfer.senderEmail),
+        date: String(transfer.date),
+        amount: Number(transfer.amount),
+        reference: String(transfer.reference),
+        submittedAt: new Date().toISOString(),
+      };
+      order.status = "transfer_submitted";
+      writeJsonFile(ORDERS_FILE, orders);
+      return sendJson(res, 200, { message: "Transfer information submitted", order });
+    }
+
     // --- API: 更新訂單狀態 ---
     if (pathname.startsWith("/api/orders/") && req.method === "PATCH") {
       const id = decodeURIComponent(pathname.split("/api/orders/")[1]);
       const body = await readRequestBody(req);
-      const allowedStatuses = ["received", "preparing", "ready", "completed", "cancelled"];
+      const allowedStatuses = [
+        "awaiting_transfer",
+        "transfer_submitted",
+        "payment_confirmed",
+        "preparing",
+        "ready",
+        "completed",
+        "cancelled",
+      ];
 
       if (!allowedStatuses.includes(body.status)) {
         return sendJson(res, 400, { error: "Invalid order status." });
