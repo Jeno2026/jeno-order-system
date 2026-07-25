@@ -13,6 +13,8 @@ const HOST = process.env.HOST || "0.0.0.0";
 const PRODUCTS_FILE = path.join(__dirname, "data", "products.json");
 const ORDERS_FILE = path.join(__dirname, "data", "orders.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
+const UPLOADS_DIR = path.join(PUBLIC_DIR, "uploads");
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // ---------- 小工具函式 ----------
 
@@ -42,7 +44,7 @@ function readRequestBody(req) {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1024 * 1024) {
+      if (body.length > 8 * 1024 * 1024) {
         reject(new Error("Request body is too large"));
         req.destroy();
       }
@@ -66,6 +68,9 @@ function getContentType(filePath) {
     ".js": "application/javascript",
     ".png": "image/png",
     ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
     ".svg": "image/svg+xml",
   };
   return types[ext] || "application/octet-stream";
@@ -87,6 +92,41 @@ const server = http.createServer(async (req, res) => {
     if (pathname === "/api/products" && req.method === "GET") {
       const products = readJsonFile(PRODUCTS_FILE);
       return sendJson(res, 200, products);
+    }
+
+    // --- API: 上傳商品圖片（展示版；正式環境建議改用物件儲存） ---
+    if (pathname === "/api/uploads" && req.method === "POST") {
+      const body = await readRequestBody(req);
+      const match = typeof body.data === "string"
+        ? body.data.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/)
+        : null;
+
+      if (!match) {
+        return sendJson(res, 400, { error: "Only PNG, JPEG, WebP, and GIF images are allowed." });
+      }
+
+      const extensionByType = {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/webp": "webp",
+        "image/gif": "gif",
+      };
+      const imageBuffer = Buffer.from(match[2], "base64");
+
+      if (imageBuffer.length === 0 || imageBuffer.length > 5 * 1024 * 1024) {
+        return sendJson(res, 400, { error: "Image must be smaller than 5 MB." });
+      }
+
+      const safeStem = String(body.filename || "product")
+        .replace(/\.[^.]+$/, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+        .slice(0, 40) || "product";
+      const fileName = safeStem + "-" + Date.now() + "." + extensionByType[match[1]];
+      fs.writeFileSync(path.join(UPLOADS_DIR, fileName), imageBuffer);
+
+      return sendJson(res, 201, { image: "/uploads/" + fileName });
     }
 
     // --- API: 新增商品 ---
@@ -177,15 +217,28 @@ const server = http.createServer(async (req, res) => {
       if (!body.items || Object.keys(body.items).length === 0) {
         return sendJson(res, 400, { error: "Order must contain at least one item." });
       }
+      if (!body.customer || !body.customer.name || !body.customer.phone || !body.customer.email) {
+        return sendJson(res, 400, { error: "Customer name, phone, and email are required." });
+      }
+      if (!body.fulfillment || !body.fulfillment.method || !body.fulfillment.date) {
+        return sendJson(res, 400, { error: "Fulfillment method and date are required." });
+      }
+      if (body.fulfillment.method === "delivery" && !body.fulfillment.address) {
+        return sendJson(res, 400, { error: "Delivery address is required." });
+      }
 
       const orders = readJsonFile(ORDERS_FILE);
 
       const newOrder = {
-        id: "order_" + Date.now(), // 用時間戳記當簡單的訂單編號
+        id: "JENO-" + Date.now(),
         items: body.items,
-        total: body.total,
+        total: Number(body.total) || 0,
+        customer: body.customer,
+        fulfillment: body.fulfillment,
+        paymentMethod: "etransfer",
+        payment: null,
         createdAt: new Date().toISOString(),
-        status: "received",
+        status: "awaiting_transfer",
       };
 
       orders.push(newOrder);
@@ -200,11 +253,51 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, orders);
     }
 
+    // --- API: 顧客提交 e-Transfer 資料 ---
+    if (/^\/api\/orders\/[^/]+\/payment$/.test(pathname) && req.method === "PATCH") {
+      const id = decodeURIComponent(pathname.split("/")[3]);
+      const body = await readRequestBody(req);
+      const transfer = body.transfer || {};
+
+      if (!transfer.senderName || !transfer.senderEmail || !transfer.date ||
+          !transfer.reference || !Number.isFinite(Number(transfer.amount)) ||
+          Number(transfer.amount) <= 0) {
+        return sendJson(res, 400, { error: "Complete transfer information is required." });
+      }
+
+      const orders = readJsonFile(ORDERS_FILE);
+      const order = orders.find((item) => item.id === id);
+
+      if (!order) {
+        return sendJson(res, 404, { error: "Order not found." });
+      }
+
+      order.payment = {
+        senderName: String(transfer.senderName),
+        senderEmail: String(transfer.senderEmail),
+        date: String(transfer.date),
+        amount: Number(transfer.amount),
+        reference: String(transfer.reference),
+        submittedAt: new Date().toISOString(),
+      };
+      order.status = "transfer_submitted";
+      writeJsonFile(ORDERS_FILE, orders);
+      return sendJson(res, 200, { message: "Transfer information submitted", order });
+    }
+
     // --- API: 更新訂單狀態 ---
     if (pathname.startsWith("/api/orders/") && req.method === "PATCH") {
       const id = decodeURIComponent(pathname.split("/api/orders/")[1]);
       const body = await readRequestBody(req);
-      const allowedStatuses = ["received", "preparing", "ready", "completed", "cancelled"];
+      const allowedStatuses = [
+        "awaiting_transfer",
+        "transfer_submitted",
+        "payment_confirmed",
+        "preparing",
+        "ready",
+        "completed",
+        "cancelled",
+      ];
 
       if (!allowedStatuses.includes(body.status)) {
         return sendJson(res, 400, { error: "Invalid order status." });
