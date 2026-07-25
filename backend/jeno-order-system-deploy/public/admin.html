@@ -488,11 +488,10 @@
     for (const category in groups) {
       html += '<div class="category-group">';
       html += "<h3>" + escapeHtml(category) + "</h3>";
-      html += "<table><thead><tr><th>Icon</th><th>Name</th><th>Price</th><th></th></tr></thead><tbody>";
+      html += "<table><thead><tr><th>Name</th><th>Price</th><th></th></tr></thead><tbody>";
 
       for (const p of groups[category]) {
         html += "<tr>";
-        html += "<td>" + escapeHtml(p.emoji) + "</td>";
         html += "<td>" + escapeHtml(p.name) + "</td>";
         const priceSummary = Array.isArray(p.options) && p.options.length
           ? p.options.map((option) =>
