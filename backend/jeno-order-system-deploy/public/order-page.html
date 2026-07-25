@@ -182,12 +182,61 @@
     color: #877d70;
     margin: 12px 0 4px 0;
   }
-  .payment-form input {
+  .payment-form input,
+  .payment-form select,
+  .payment-form textarea {
     width: 100%;
     padding: 8px;
     border: 1px solid #d8d0c2;
     border-radius: 6px;
     font-size: 14px;
+    font-family: inherit;
+    background: white;
+  }
+  .payment-form textarea {
+    min-height: 78px;
+    resize: vertical;
+  }
+  .required-mark {
+    color: #a75b4b;
+  }
+  .transfer-box {
+    background: #f7f3ec;
+    border: 1px solid #d8d0c2;
+    border-radius: 10px;
+    padding: 16px;
+    margin: 18px 0;
+    color: #4a453d;
+    line-height: 1.6;
+  }
+  .transfer-box strong {
+    color: #6e6459;
+  }
+  .transfer-status {
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 14px;
+    font-size: 14px;
+    display: none;
+  }
+  .transfer-status.success {
+    display: block;
+    background: #edf4eb;
+    color: #486146;
+  }
+  .transfer-status.error {
+    display: block;
+    background: #f8e9e6;
+    color: #8b493e;
+  }
+  .form-help {
+    margin: 8px 0 0;
+    color: #877d70;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .hidden {
+    display: none !important;
   }
   .payment-form-row {
     display: flex;
@@ -721,25 +770,80 @@
     <!-- Filled in by JavaScript with the cart contents -->
   </div>
 
-  <div class="payment-form">
-    <label for="payName">Name on card</label>
-    <input type="text" id="payName" placeholder="Jane Smith">
+  <div class="payment-form" id="customerForm">
+    <h2>Customer information</h2>
 
-    <label for="payCard">Card number</label>
-    <input type="text" id="payCard" placeholder="1234 5678 9012 3456">
+    <label for="customerName">Full name <span class="required-mark">*</span></label>
+    <input type="text" id="customerName" autocomplete="name" placeholder="Jane Smith">
+
+    <label for="customerPhone">Phone number <span class="required-mark">*</span></label>
+    <input type="tel" id="customerPhone" autocomplete="tel" placeholder="604-555-0123">
+
+    <label for="customerEmail">Email <span class="required-mark">*</span></label>
+    <input type="email" id="customerEmail" autocomplete="email" placeholder="jane@example.com">
+
+    <label for="fulfillmentMethod">Pickup or delivery <span class="required-mark">*</span></label>
+    <select id="fulfillmentMethod" onchange="toggleDeliveryAddress()">
+      <option value="pickup">Pickup</option>
+      <option value="delivery">Delivery</option>
+    </select>
+
+    <div id="deliveryAddressWrap" class="hidden">
+      <label for="deliveryAddress">Delivery address <span class="required-mark">*</span></label>
+      <textarea id="deliveryAddress" autocomplete="street-address" placeholder="Street address, city, postal code"></textarea>
+    </div>
 
     <div class="payment-form-row">
       <div>
-        <label for="payExpiry">Expiry</label>
-        <input type="text" id="payExpiry" placeholder="MM/YY">
+        <label for="fulfillmentDate">Preferred date <span class="required-mark">*</span></label>
+        <input type="date" id="fulfillmentDate">
       </div>
       <div>
-        <label for="payCvv">CVV</label>
-        <input type="text" id="payCvv" placeholder="123">
+        <label for="fulfillmentTime">Preferred time</label>
+        <input type="time" id="fulfillmentTime">
       </div>
     </div>
 
-    <button class="pay-now-btn" onclick="placeOrder()">Pay Now</button>
+    <label for="orderNotes">Order notes / allergy information</label>
+    <textarea id="orderNotes" placeholder="Special requests or allergy information"></textarea>
+
+    <button class="pay-now-btn" id="placeOrderBtn" onclick="placeOrder()">Place Order</button>
+    <p class="form-help">No credit card information is collected. Your order will be held while we wait for your e-Transfer.</p>
+  </div>
+
+  <div class="payment-form hidden" id="transferConfirmation">
+    <h2>Complete your e-Transfer</h2>
+    <div class="transfer-box">
+      <div>Order number: <strong id="transferOrderId"></strong></div>
+      <div>Amount: <strong id="transferAmount"></strong></div>
+      <div>Send to: <strong id="transferEmail"></strong></div>
+      <div>Message: <strong>Use your order number</strong></div>
+      <p class="form-help">Please transfer the exact amount within 24 hours. Your order is confirmed only after we verify the payment.</p>
+    </div>
+
+    <h2>After transferring</h2>
+    <label for="transferSenderName">Sender name <span class="required-mark">*</span></label>
+    <input type="text" id="transferSenderName" placeholder="Name used for the transfer">
+
+    <label for="transferSenderEmail">Sender Email <span class="required-mark">*</span></label>
+    <input type="email" id="transferSenderEmail" placeholder="Email used for the transfer">
+
+    <div class="payment-form-row">
+      <div>
+        <label for="transferDate">Transfer date <span class="required-mark">*</span></label>
+        <input type="date" id="transferDate">
+      </div>
+      <div>
+        <label for="transferAmountInput">Amount <span class="required-mark">*</span></label>
+        <input type="number" id="transferAmountInput" min="0" step="0.01">
+      </div>
+    </div>
+
+    <label for="transferReference">Confirmation / reference number <span class="required-mark">*</span></label>
+    <input type="text" id="transferReference" placeholder="e-Transfer confirmation number">
+
+    <button class="pay-now-btn" id="submitTransferBtn" onclick="submitTransferDetails()">I Have Sent the Transfer</button>
+    <div class="transfer-status" id="transferStatus"></div>
   </div>
 </div>
 
@@ -752,6 +856,8 @@
   let selectedCakeSize = '4"';
   let selectedRollPack = "single";
   let detailQuantity = 1;
+  let currentOrder = null;
+  const ETRANSFER_EMAIL = "YOUR-EMAIL@example.com";
   const cakeSizes = [
     { label: '4"', price: 35 },
     { label: '6"', price: 50 },
@@ -1161,6 +1267,10 @@
     document.getElementById("paymentSummary").innerHTML = buildCartLinesHtml();
     document.getElementById("mainView").style.display = "none";
     document.getElementById("paymentPage").classList.add("open");
+    document.getElementById("customerForm").classList.remove("hidden");
+    document.getElementById("transferConfirmation").classList.add("hidden");
+    const dateInput = document.getElementById("fulfillmentDate");
+    dateInput.min = new Date().toISOString().split("T")[0];
     document.getElementById("cartPanel").classList.remove("open");
     window.scrollTo(0, 0);
   }
@@ -1170,32 +1280,132 @@
     document.getElementById("mainView").style.display = "block";
   }
 
-  // This actually sends the order to the backend server to be saved
+  function toggleDeliveryAddress() {
+    const isDelivery = document.getElementById("fulfillmentMethod").value === "delivery";
+    document.getElementById("deliveryAddressWrap").classList.toggle("hidden", !isDelivery);
+  }
+
+  function getFieldValue(id) {
+    return document.getElementById(id).value.trim();
+  }
+
+  // Create a pending order before the customer sends the e-Transfer.
   async function placeOrder() {
+    const customer = {
+      name: getFieldValue("customerName"),
+      phone: getFieldValue("customerPhone"),
+      email: getFieldValue("customerEmail"),
+    };
+    const fulfillment = {
+      method: document.getElementById("fulfillmentMethod").value,
+      address: getFieldValue("deliveryAddress"),
+      date: getFieldValue("fulfillmentDate"),
+      time: getFieldValue("fulfillmentTime"),
+      notes: getFieldValue("orderNotes"),
+    };
+
+    if (!customer.name || !customer.phone || !customer.email || !fulfillment.date) {
+      alert("Please complete your name, phone, email, and preferred date.");
+      return;
+    }
+    if (!customer.email.includes("@")) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+    if (fulfillment.method === "delivery" && !fulfillment.address) {
+      alert("Please enter a delivery address.");
+      return;
+    }
+
     let total = 0;
     for (let id in cart) {
       total += cart[id].price * cart[id].qty;
     }
 
+    const button = document.getElementById("placeOrderBtn");
+    button.disabled = true;
+    button.textContent = "Creating order...";
+
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cart, total: total }),
+        body: JSON.stringify({
+          items: cart,
+          total,
+          customer,
+          fulfillment,
+          paymentMethod: "etransfer",
+        }),
       });
 
       if (!res.ok) throw new Error("Order failed");
 
       const data = await res.json();
-      alert("Thank you! Your order (" + data.order.id + ") has been received.\n\n(This is a demo — no real payment was processed.)");
+      currentOrder = data.order;
+      document.getElementById("transferOrderId").textContent = currentOrder.id;
+      document.getElementById("transferAmount").textContent = "$" + Number(total).toFixed(2);
+      document.getElementById("transferEmail").textContent = ETRANSFER_EMAIL;
+      document.getElementById("transferSenderName").value = customer.name;
+      document.getElementById("transferSenderEmail").value = customer.email;
+      document.getElementById("transferAmountInput").value = Number(total).toFixed(2);
+      document.getElementById("transferDate").value = new Date().toISOString().split("T")[0];
+      document.getElementById("customerForm").classList.add("hidden");
+      document.getElementById("transferConfirmation").classList.remove("hidden");
 
-      // Clear the cart and go back to the menu
       cart = {};
       updateCartBadge();
       renderCartPanel();
-      backToMenu();
+      window.scrollTo(0, 0);
     } catch (err) {
-      alert("Something went wrong placing your order. Please try again.");
+      alert("Something went wrong creating your order. Please try again.");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Place Order";
+    }
+  }
+
+  async function submitTransferDetails() {
+    if (!currentOrder) return;
+
+    const transfer = {
+      senderName: getFieldValue("transferSenderName"),
+      senderEmail: getFieldValue("transferSenderEmail"),
+      date: getFieldValue("transferDate"),
+      amount: Number(document.getElementById("transferAmountInput").value),
+      reference: getFieldValue("transferReference"),
+    };
+    const status = document.getElementById("transferStatus");
+
+    if (!transfer.senderName || !transfer.senderEmail || !transfer.date ||
+        !transfer.reference || !Number.isFinite(transfer.amount) || transfer.amount <= 0) {
+      status.className = "transfer-status error";
+      status.textContent = "Please complete all transfer confirmation fields.";
+      return;
+    }
+
+    const button = document.getElementById("submitTransferBtn");
+    button.disabled = true;
+    button.textContent = "Submitting...";
+
+    try {
+      const res = await fetch("/api/orders/" + encodeURIComponent(currentOrder.id) + "/payment", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transfer }),
+      });
+      if (!res.ok) throw new Error("Transfer submission failed");
+
+      status.className = "transfer-status success";
+      status.innerHTML = "Your transfer information has been submitted. " +
+        "We will verify the payment before confirming your order.<br><strong>Order: " +
+        escapeHtml(currentOrder.id) + "</strong>";
+      button.classList.add("hidden");
+    } catch (err) {
+      status.className = "transfer-status error";
+      status.textContent = "Could not submit the transfer information. Please try again.";
+      button.disabled = false;
+      button.textContent = "I Have Sent the Transfer";
     }
   }
 </script>
