@@ -208,6 +208,25 @@
   .order-total {
     font-weight: 700;
   }
+  .order-details {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 12px 0;
+    font-size: 13px;
+    color: #4a453d;
+  }
+  .order-details-block {
+    background: #f7f3ec;
+    border-radius: 8px;
+    padding: 12px;
+    line-height: 1.6;
+  }
+  .order-details-block strong {
+    display: block;
+    margin-bottom: 4px;
+    color: #6e6459;
+  }
   .status-select {
     width: auto;
     min-width: 130px;
@@ -245,6 +264,30 @@
     background: #e6e0d6;
     color: #4a453d;
   }
+  .image-upload-box {
+    border: 1px dashed #cfc7ba;
+    border-radius: 8px;
+    padding: 12px;
+    background: #faf8f4;
+  }
+  .image-upload-box input[type="file"] {
+    border: 0;
+    padding: 4px 0;
+  }
+  .image-preview {
+    display: none;
+    width: 110px;
+    height: 110px;
+    margin-top: 10px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #e6e0d6;
+  }
+  .upload-note {
+    margin: 6px 0 0;
+    color: #877d70;
+    font-size: 11px;
+  }
   @media (max-width: 600px) {
     .form-row {
       grid-template-columns: 1fr;
@@ -252,6 +295,9 @@
     .order-heading, .order-footer {
       align-items: flex-start;
       flex-direction: column;
+    }
+    .order-details {
+      grid-template-columns: 1fr;
     }
   }
 </style>
@@ -299,14 +345,18 @@
         <input type="text" id="productName" placeholder="e.g. Chocolate Cake">
       </div>
     </div>
-    <div class="form-row">
+    <div class="form-row full">
       <div>
         <label for="productImage">Image path</label>
-        <input type="text" id="productImage" placeholder="/images/chocolate-cake.png">
+        <input type="text" id="productImage" placeholder="/images/chocolate-cake.png" oninput="showImagePreview(this.value.trim())">
       </div>
-      <div>
-        <label for="productEmoji">Icon (emoji fallback)</label>
-        <input type="text" id="productEmoji" placeholder="🍰">
+    </div>
+    <div class="form-row full">
+      <div class="image-upload-box">
+        <label for="productImageFile">Upload product image</label>
+        <input type="file" id="productImageFile" accept="image/png,image/jpeg,image/webp,image/gif" onchange="uploadProductImage(this)">
+        <p class="upload-note">PNG, JPEG, WebP or GIF; maximum 5 MB.</p>
+        <img class="image-preview" id="productImagePreview" alt="Product image preview">
       </div>
     </div>
     <div class="form-row full">
@@ -344,11 +394,14 @@
   let allOrders = [];
   let editingProductId = null;
   const orderStatuses = [
-    ["received", "Received"],
+    ["awaiting_transfer", "Awaiting Transfer"],
+    ["transfer_submitted", "Transfer Submitted"],
+    ["payment_confirmed", "Payment Confirmed"],
     ["preparing", "Preparing"],
     ["ready", "Ready"],
     ["completed", "Completed"],
     ["cancelled", "Cancelled"],
+    ["received", "Received (Legacy)"],
   ];
 
   function showView(view) {
@@ -398,11 +451,38 @@
         (order.status === value ? " selected" : "") + ">" + label + "</option>"
       ).join("");
 
+      const customer = order.customer || {};
+      const fulfillment = order.fulfillment || {};
+      const payment = order.payment || {};
+      const customerDetails =
+        '<div class="order-details-block"><strong>Customer</strong>' +
+        escapeHtml(customer.name || "Not provided") + "<br>" +
+        escapeHtml(customer.phone || "") + "<br>" +
+        escapeHtml(customer.email || "") + "</div>";
+      const fulfillmentDetails =
+        '<div class="order-details-block"><strong>Fulfillment</strong>' +
+        escapeHtml(fulfillment.method === "delivery" ? "Delivery" : "Pickup") +
+        (fulfillment.date ? "<br>" + escapeHtml(fulfillment.date) : "") +
+        (fulfillment.time ? " at " + escapeHtml(fulfillment.time) : "") +
+        (fulfillment.address ? "<br>" + escapeHtml(fulfillment.address) : "") +
+        (fulfillment.notes ? "<br>Notes: " + escapeHtml(fulfillment.notes) : "") +
+        "</div>";
+      const paymentDetails = payment.reference
+        ? '<div class="order-details-block"><strong>e-Transfer submitted</strong>' +
+          "Sender: " + escapeHtml(payment.senderName || "") + "<br>" +
+          "Email: " + escapeHtml(payment.senderEmail || "") + "<br>" +
+          "Date: " + escapeHtml(payment.date || "") + "<br>" +
+          "Amount: $" + Number(payment.amount || 0).toFixed(2) + "<br>" +
+          "Reference: " + escapeHtml(payment.reference || "") + "</div>"
+        : '<div class="order-details-block"><strong>Payment</strong>Waiting for e-Transfer information.</div>';
+
       return '<article class="order-card">' +
         '<div class="order-heading"><span class="order-id">' +
         escapeHtml(order.id) + '</span><time class="order-time">' +
         new Date(order.createdAt).toLocaleString() + "</time></div>" +
         '<div class="order-items">' + items + "</div>" +
+        '<div class="order-details">' + customerDetails + fulfillmentDetails +
+        paymentDetails + "</div>" +
         '<div class="order-footer"><span class="order-total">Total: $' +
         Number(order.total || 0).toFixed(2) + '</span><select class="status-select" ' +
         'aria-label="Order status" onchange="updateOrderStatus(\'' +
@@ -460,11 +540,10 @@
     for (const category in groups) {
       html += '<div class="category-group">';
       html += "<h3>" + escapeHtml(category) + "</h3>";
-      html += "<table><thead><tr><th>Icon</th><th>Name</th><th>Price</th><th></th></tr></thead><tbody>";
+      html += "<table><thead><tr><th>Name</th><th>Price</th><th></th></tr></thead><tbody>";
 
       for (const p of groups[category]) {
         html += "<tr>";
-        html += "<td>" + escapeHtml(p.emoji) + "</td>";
         html += "<td>" + escapeHtml(p.name) + "</td>";
         const priceSummary = Array.isArray(p.options) && p.options.length
           ? p.options.map((option) =>
@@ -581,6 +660,61 @@
     return "quantity";
   }
 
+  async function uploadProductImage(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type)) {
+      showAddStatus("Please choose a PNG, JPEG, WebP, or GIF image.", "error");
+      input.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showAddStatus("Image must be smaller than 5 MB.", "error");
+      input.value = "";
+      return;
+    }
+
+    showAddStatus("Uploading image...", "success");
+    try {
+      const data = await readFileAsDataUrl(file);
+      const res = await fetch("/api/uploads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, data }),
+      });
+      if (!res.ok) throw new Error("Upload failed");
+
+      const result = await res.json();
+      document.getElementById("productImage").value = result.image;
+      showImagePreview(result.image);
+      showAddStatus("Image uploaded!", "success");
+    } catch (err) {
+      showAddStatus("Could not upload the image.", "error");
+    }
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function showImagePreview(src) {
+    const preview = document.getElementById("productImagePreview");
+    if (!src) {
+      preview.style.display = "none";
+      preview.removeAttribute("src");
+      return;
+    }
+    preview.src = src;
+    preview.style.display = "block";
+  }
+
   function emojiForCategory(category) {
     if (category === "Cakes") return "🍰";
     if (category === "Cinnamon Rolls") return "🌀";
@@ -593,7 +727,12 @@
     const name = document.getElementById("productName").value.trim();
     const image = document.getElementById("productImage").value.trim();
     const description = document.getElementById("productDescription").value.trim();
-    const emoji = document.getElementById("productEmoji").value.trim() || emojiForCategory(category);
+    const existingProduct = editingProductId
+      ? allProducts.find((product) => product.id === editingProductId)
+      : null;
+    const emoji = existingProduct && existingProduct.category === category
+      ? existingProduct.emoji
+      : emojiForCategory(category);
     const options = getFormOptions();
 
     if (!name) {
@@ -658,8 +797,9 @@
     document.getElementById("productCategory").value = product.category;
     document.getElementById("productName").value = product.name;
     document.getElementById("productImage").value = product.image || "";
+    document.getElementById("productImageFile").value = "";
+    showImagePreview(product.image || "");
     document.getElementById("productDescription").value = product.description || "";
-    document.getElementById("productEmoji").value = product.emoji || "";
     renderVariantRows(
       Array.isArray(product.options) && product.options.length
         ? product.options
@@ -676,8 +816,9 @@
     document.getElementById("productCategory").value = "Cakes";
     document.getElementById("productName").value = "";
     document.getElementById("productImage").value = "";
+    document.getElementById("productImageFile").value = "";
+    showImagePreview("");
     document.getElementById("productDescription").value = "";
-    document.getElementById("productEmoji").value = "";
     renderVariantRows(categoryDefaults("Cakes"));
   }
 
