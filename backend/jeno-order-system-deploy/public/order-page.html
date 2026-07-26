@@ -653,6 +653,7 @@
 </head>
 <body>
 
+
 <div class="header" id="siteHeader">
   <div class="header-inner">
     <nav class="header-nav">
@@ -660,7 +661,7 @@
       <a href="#about">About</a>
     </nav>
     <div class="header-logo">
-      <img src="/images/jeno-logo.png?v=20260725-3" alt="JÉNO Pâtisserie">
+      <img src="/images/jeno-logo.png?v=20260726-white" alt="JÉNO Pâtisserie">
     </div>
     <div class="cart-wrap">
       <button class="cart-icon" onclick="toggleCart()" aria-label="View cart">
@@ -679,7 +680,9 @@
   </div>
 </div>
 
+
 <div id="mainView">
+
 
 <div class="hero">
   <div class="hero-inner">
@@ -687,17 +690,20 @@
   </div>
 </div>
 
+
 <div class="category-nav" id="categoryNav">
   <div class="category-nav-inner" id="categoryNavInner">
     <!-- Filled in dynamically once products load -->
   </div>
 </div>
 
+
 <div class="content" id="menu">
 <div class="content-inner" id="menuContentInner">
   <p style="text-align:center; color:#877d70;">Loading menu...</p>
 </div>
 </div>
+
 
 <div class="product-detail" id="productDetail" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
   <div class="product-detail-panel">
@@ -722,6 +728,8 @@
     </div>
   </div>
 </div>
+
+
 
 
 <div class="footer">
@@ -760,27 +768,35 @@
   </div>
 </div>
 
+
 </div>
+
 
 <div class="payment-page" id="paymentPage">
   <a class="back-link" onclick="backToMenu()">&larr; Back to menu</a>
   <h2>Checkout</h2>
 
+
   <div class="payment-summary" id="paymentSummary">
     <!-- Filled in by JavaScript with the cart contents -->
   </div>
 
+
   <div class="payment-form" id="customerForm">
     <h2>Customer information</h2>
+
 
     <label for="customerName">Full name <span class="required-mark">*</span></label>
     <input type="text" id="customerName" autocomplete="name" placeholder="Jane Smith">
 
+
     <label for="customerPhone">Phone number <span class="required-mark">*</span></label>
     <input type="tel" id="customerPhone" autocomplete="tel" placeholder="604-555-0123">
 
+
     <label for="customerEmail">Email <span class="required-mark">*</span></label>
     <input type="email" id="customerEmail" autocomplete="email" placeholder="jane@example.com">
+
 
     <label for="fulfillmentMethod">Pickup or delivery <span class="required-mark">*</span></label>
     <select id="fulfillmentMethod" onchange="toggleDeliveryAddress()">
@@ -788,10 +804,12 @@
       <option value="delivery">Delivery</option>
     </select>
 
+
     <div id="deliveryAddressWrap" class="hidden">
       <label for="deliveryAddress">Delivery address <span class="required-mark">*</span></label>
       <textarea id="deliveryAddress" autocomplete="street-address" placeholder="Street address, city, postal code"></textarea>
     </div>
+
 
     <div class="payment-form-row">
       <div>
@@ -804,12 +822,15 @@
       </div>
     </div>
 
+
     <label for="orderNotes">Order notes / allergy information</label>
     <textarea id="orderNotes" placeholder="Special requests or allergy information"></textarea>
+
 
     <button class="pay-now-btn" id="placeOrderBtn" onclick="placeOrder()">Place Order</button>
     <p class="form-help">No credit card information is collected. Your order will be held while we wait for your e-Transfer.</p>
   </div>
+
 
   <div class="payment-form hidden" id="transferConfirmation">
     <h2>Complete your e-Transfer</h2>
@@ -821,12 +842,15 @@
       <p class="form-help">Please transfer the exact amount within 24 hours. Your order is confirmed only after we verify the payment.</p>
     </div>
 
+
     <h2>After transferring</h2>
     <label for="transferSenderName">Sender name <span class="required-mark">*</span></label>
     <input type="text" id="transferSenderName" placeholder="Name used for the transfer">
 
+
     <label for="transferSenderEmail">Sender Email <span class="required-mark">*</span></label>
     <input type="email" id="transferSenderEmail" placeholder="Email used for the transfer">
+
 
     <div class="payment-form-row">
       <div>
@@ -839,13 +863,16 @@
       </div>
     </div>
 
+
     <label for="transferReference">Confirmation / reference number <span class="required-mark">*</span></label>
     <input type="text" id="transferReference" placeholder="e-Transfer confirmation number">
+
 
     <button class="pay-now-btn" id="submitTransferBtn" onclick="submitTransferDetails()">I Have Sent the Transfer</button>
     <div class="transfer-status" id="transferStatus"></div>
   </div>
 </div>
+
 
 <script>
   // Cart is stored as an object: { itemId: { name, price, qty } }
@@ -918,6 +945,7 @@
     },
   };
 
+
   function getProductDetail(product) {
     if (
       product.image ||
@@ -933,6 +961,7 @@
     return cakeDetails[product.id] || rollDetails[product.id] || tiramisuDetails[product.id];
   }
 
+
   // ---------- Load the menu from the backend ----------
   async function loadMenu() {
     try {
@@ -946,16 +975,19 @@
     }
   }
 
+
   // Turn a category name like "Cinnamon Rolls" into a URL-safe id like "cinnamon-rolls"
   function slugify(text) {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   }
+
 
   function escapeHtml(str) {
     const div = document.createElement("div");
     div.innerText = str;
     return div.innerHTML;
   }
+
 
   // ---------- Render the sticky category navigation links ----------
   function renderCategoryNav() {
@@ -967,6 +999,7 @@
     document.getElementById("categoryNavInner").innerHTML = html;
   }
 
+
   // ---------- Render the menu, grouped by category, as product cards ----------
   function renderMenu() {
     const groups = {};
@@ -975,11 +1008,13 @@
       groups[p.category].push(p);
     }
 
+
     let html = "";
     for (const category in groups) {
       html += '<div class="menu-section" id="' + slugify(category) + '">';
       html += '<h2 class="section-title">' + escapeHtml(category) + "</h2>";
       html += '<div class="menu-grid">';
+
 
       for (const p of groups[category]) {
         const cardId = "card_" + p.id;
@@ -998,417 +1033,16 @@
             : p.emoji) + "</div>";
         html += '<div class="card-body">';
         html += '<p class="card-name">' + escapeHtml(p.name) + "</p>";
-        html += '<p class="card-price">' +
-          (p.optionType === "size" || cakeDetails[p.id] ? "From $" +
-            Number((p.options && p.options[0] ? p.options[0].price : 35)).toFixed(2)
-            : "$" + Number(p.price).toFixed(2)) + "</p>";
-        html += "</div></div>";
-      }
-
-      html += "</div></div>";
-    }
-
-    document.getElementById("menuContentInner").innerHTML = html;
-  }
-
-  function positionCategoryNav() {
-    let headerHeight = document.getElementById("siteHeader").offsetHeight;
-    document.getElementById("categoryNav").style.top = headerHeight + "px";
-  }
-
-  window.addEventListener("load", function() {
-    loadMenu();
-    positionCategoryNav();
-  });
-  window.addEventListener("resize", positionCategoryNav);
-
-  function openProductDetail(productId) {
-    const product = allProducts.find((item) => item.id === productId);
-    const detail = getProductDetail(product);
-    if (!product || !detail) return;
-
-    activeProduct = product;
-    activeProductType = product.optionType === "size"
-      ? "cake"
-      : product.optionType === "pack" ? "roll"
-      : product.optionType === "quantity" ? "tiramisu"
-      : cakeDetails[productId] ? "cake"
-      : rollDetails[productId] ? "roll" : "tiramisu";
-    selectedCakeSize = product.options && product.options[0]
-      ? product.options[0].label
-      : '4"';
-    selectedRollPack = product.options && product.options[0]
-      ? product.options[0].value
-      : "single";
-    detailQuantity = 1;
-    document.getElementById("detailTitle").innerText = product.name;
-    document.getElementById("detailDescription").innerText =
-      detail.description || "Choose an option and quantity to add this item to your cart.";
-    const detailImage = document.getElementById("detailImage");
-    const detailEmoji = document.getElementById("detailEmoji");
-    if (detail.image) {
-      detailImage.src = detail.image;
-      detailImage.alt = product.name;
-      detailImage.style.display = "block";
-      detailEmoji.style.display = "none";
-    } else {
-      detailImage.removeAttribute("src");
-      detailImage.alt = "";
-      detailImage.style.display = "none";
-      detailEmoji.innerText = product.emoji || "🍽️";
-      detailEmoji.style.display = "flex";
-    }
-    renderProductOptions();
-    document.getElementById("productDetail").classList.add("open");
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeProductDetail() {
-    document.getElementById("productDetail").classList.remove("open");
-    document.body.style.overflow = "";
-  }
-
-  function renderProductOptions() {
-    const optionLabel = document.getElementById("optionLabel");
-    const quantityRow = document.getElementById("quantityRow");
-    let selectedPrice = 0;
-
-    if (activeProductType === "cake") {
-      optionLabel.innerText = "Choose a size";
-      optionLabel.style.display = "";
-      document.getElementById("sizeOptions").style.display = "";
-      quantityRow.classList.remove("visible");
-      const sizeOptions = activeProduct.options && activeProduct.options.length
-        ? activeProduct.options
-        : cakeSizes;
-      document.getElementById("sizeOptions").innerHTML = sizeOptions.map((size, index) =>
-        '<button class="size-option' + (size.label === selectedCakeSize ? " selected" : "") +
-        '" onclick="selectCakeSize(' + index + ')">' +
-        size.label + "<br>$" + size.price.toFixed(2) + "</button>"
-      ).join("");
-      selectedPrice = sizeOptions.find((size) => size.label === selectedCakeSize).price;
-    } else if (activeProductType === "roll") {
-      const singlePrice = Number(activeProduct.price);
-      const rollPacks = activeProduct.options && activeProduct.options.length
-        ? activeProduct.options
-        : [
-        { value: "single", label: "1 roll", price: singlePrice },
-        { value: "dozen", label: "Dozen (12)", price: singlePrice * 12 },
-      ];
-      optionLabel.innerText = "Choose a pack";
-      optionLabel.style.display = "";
-      document.getElementById("sizeOptions").style.display = "";
-      quantityRow.classList.add("visible");
-      document.getElementById("detailQuantity").innerText = detailQuantity;
-      document.getElementById("sizeOptions").innerHTML = rollPacks.map((pack, index) =>
-        '<button class="size-option' + (pack.value === selectedRollPack ? " selected" : "") +
-        '" onclick="selectRollPack(' + index + ')">' +
-        pack.label + "<br>$" + pack.price.toFixed(2) + "</button>"
-      ).join("");
-      selectedPrice = rollPacks.find((pack) => pack.value === selectedRollPack).price;
-    } else {
-      optionLabel.style.display = "none";
-      document.getElementById("sizeOptions").style.display = "none";
-      document.getElementById("sizeOptions").innerHTML = "";
-      quantityRow.classList.add("visible");
-      document.getElementById("detailQuantity").innerText = detailQuantity;
-      selectedPrice = Number(activeProduct.price);
-    }
-
-    document.getElementById("detailAddButton").innerText =
-      "Add to cart — $" + (selectedPrice * detailQuantity).toFixed(2);
-  }
-
-  function selectCakeSize(sizeIndex) {
-    const sizeOptions = activeProduct.options && activeProduct.options.length
-      ? activeProduct.options
-      : cakeSizes;
-    selectedCakeSize = sizeOptions[sizeIndex].label;
-    renderProductOptions();
-  }
-
-  function selectRollPack(packIndex) {
-    const rollPacks = activeProduct.options && activeProduct.options.length
-      ? activeProduct.options
-      : [{ value: "single" }, { value: "dozen" }];
-    selectedRollPack = rollPacks[packIndex].value;
-    renderProductOptions();
-  }
-
-  function changeDetailQuantity(change) {
-    detailQuantity = Math.max(1, Math.min(99, detailQuantity + change));
-    renderProductOptions();
-  }
-
-  function addConfiguredProduct() {
-    if (!activeProduct) return;
-
-    let optionName;
-    let price;
-    if (activeProductType === "cake") {
-      const sizeOptions = activeProduct.options && activeProduct.options.length
-        ? activeProduct.options
-        : cakeSizes;
-      const selected = sizeOptions.find((size) => size.label === selectedCakeSize);
-      optionName = selectedCakeSize;
-      price = selected.price;
-    } else if (activeProductType === "roll") {
-      const rollPacks = activeProduct.options && activeProduct.options.length
-        ? activeProduct.options
-        : [
-          { value: "single", label: "1 roll", price: Number(activeProduct.price) },
-          { value: "dozen", label: "Dozen (12)", price: Number(activeProduct.price) * 12 },
-        ];
-      const selected = rollPacks.find((pack) => pack.value === selectedRollPack);
-      optionName = selected.label;
-      price = Number(selected.price);
-    } else {
-      optionName = "Individual";
-      price = Number(activeProduct.price);
-    }
-
-    const cartId = activeProduct.id + "_" + optionName.replace(/[^a-z0-9]+/gi, "-");
-    if (cart[cartId]) {
-      cart[cartId].qty += detailQuantity;
-    } else {
-      cart[cartId] = {
-        name: activeProduct.name + " — " + optionName,
-        price: price,
-        qty: detailQuantity,
-      };
-    }
-    updateCartBadge();
-    renderCartPanel();
-    showAddedFeedback("card_" + activeProduct.id);
-    closeProductDetail();
-  }
-
-  document.getElementById("productDetail").addEventListener("click", function(event) {
-    if (event.target === this) closeProductDetail();
-  });
-
-  document.addEventListener("keydown", function(event) {
-    if (event.key === "Escape") closeProductDetail();
-  });
-
-  // ---------- Cart interactions ----------
-  function addToCart(id, name, price, cardId) {
-    if (cart[id]) {
-      cart[id].qty += 1;
-    } else {
-      cart[id] = { name: name, price: price, qty: 1 };
-    }
-
-    updateCartBadge();
-    renderCartPanel();
-    showAddedFeedback(cardId);
-  }
-
-  function updateCartBadge() {
-    let totalCount = 0;
-    for (let id in cart) {
-      totalCount += cart[id].qty;
-    }
-    document.getElementById("cartBadge").innerText = totalCount;
-  }
-
-  function buildCartLinesHtml() {
-    let ids = Object.keys(cart);
-
-    if (ids.length === 0) {
-      return '<p class="cart-panel-empty">Your cart is empty</p>';
-    }
-
-    let html = "";
-    let total = 0;
-
-    for (let id of ids) {
-      let item = cart[id];
-      let subtotal = item.price * item.qty;
-      total += subtotal;
-      html += '<div class="cart-line"><span>' + escapeHtml(item.name) + ' x' + item.qty + '</span><span>$' + subtotal.toFixed(2) + '</span></div>';
-    }
-
-    html += '<div class="cart-total"><span>Total</span><span>$' + total.toFixed(2) + '</span></div>';
-    return html;
-  }
-
-  function renderCartPanel() {
-    document.getElementById("cartContent").innerHTML = buildCartLinesHtml();
-  }
-
-  function showAddedFeedback(cardId) {
-    let card = document.getElementById(cardId);
-    if (!card) return;
-    card.classList.add("added");
-    setTimeout(function() {
-      card.classList.remove("added");
-    }, 400);
-  }
-
-  function toggleCart() {
-    document.getElementById("cartPanel").classList.toggle("open");
-  }
-
-  // Close the cart panel when clicking outside of it
-  document.addEventListener("click", function(event) {
-    let wrap = document.querySelector(".cart-wrap");
-    if (!wrap.contains(event.target)) {
-      document.getElementById("cartPanel").classList.remove("open");
-    }
-  });
-
-  // ---------- Checkout / payment flow ----------
-  function goToPayment() {
-    if (Object.keys(cart).length === 0) {
-      alert("Your cart is empty. Add an item before checking out.");
-      return;
-    }
-    document.getElementById("paymentSummary").innerHTML = buildCartLinesHtml();
-    document.getElementById("mainView").style.display = "none";
-    document.getElementById("paymentPage").classList.add("open");
-    document.getElementById("customerForm").classList.remove("hidden");
-    document.getElementById("transferConfirmation").classList.add("hidden");
-    const dateInput = document.getElementById("fulfillmentDate");
-    dateInput.min = new Date().toISOString().split("T")[0];
-    document.getElementById("cartPanel").classList.remove("open");
-    window.scrollTo(0, 0);
-  }
-
-  function backToMenu() {
-    document.getElementById("paymentPage").classList.remove("open");
-    document.getElementById("mainView").style.display = "block";
-  }
-
-  function toggleDeliveryAddress() {
-    const isDelivery = document.getElementById("fulfillmentMethod").value === "delivery";
-    document.getElementById("deliveryAddressWrap").classList.toggle("hidden", !isDelivery);
-  }
-
-  function getFieldValue(id) {
-    return document.getElementById(id).value.trim();
-  }
-
-  // Create a pending order before the customer sends the e-Transfer.
-  async function placeOrder() {
-    const customer = {
-      name: getFieldValue("customerName"),
-      phone: getFieldValue("customerPhone"),
-      email: getFieldValue("customerEmail"),
-    };
-    const fulfillment = {
-      method: document.getElementById("fulfillmentMethod").value,
-      address: getFieldValue("deliveryAddress"),
-      date: getFieldValue("fulfillmentDate"),
-      time: getFieldValue("fulfillmentTime"),
-      notes: getFieldValue("orderNotes"),
-    };
-
-    if (!customer.name || !customer.phone || !customer.email || !fulfillment.date) {
-      alert("Please complete your name, phone, email, and preferred date.");
-      return;
-    }
-    if (!customer.email.includes("@")) {
-      alert("Please enter a valid email address.");
-      return;
-    }
-    if (fulfillment.method === "delivery" && !fulfillment.address) {
-      alert("Please enter a delivery address.");
-      return;
-    }
-
-    let total = 0;
-    for (let id in cart) {
-      total += cart[id].price * cart[id].qty;
-    }
-
-    const button = document.getElementById("placeOrderBtn");
-    button.disabled = true;
-    button.textContent = "Creating order...";
-
-    try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart,
-          total,
-          customer,
-          fulfillment,
-          paymentMethod: "etransfer",
-        }),
-      });
-
-      if (!res.ok) throw new Error("Order failed");
-
-      const data = await res.json();
-      currentOrder = data.order;
-      document.getElementById("transferOrderId").textContent = currentOrder.id;
-      document.getElementById("transferAmount").textContent = "$" + Number(total).toFixed(2);
-      document.getElementById("transferEmail").textContent = ETRANSFER_EMAIL;
-      document.getElementById("transferSenderName").value = customer.name;
-      document.getElementById("transferSenderEmail").value = customer.email;
-      document.getElementById("transferAmountInput").value = Number(total).toFixed(2);
-      document.getElementById("transferDate").value = new Date().toISOString().split("T")[0];
-      document.getElementById("customerForm").classList.add("hidden");
-      document.getElementById("transferConfirmation").classList.remove("hidden");
-
-      cart = {};
-      updateCartBadge();
-      renderCartPanel();
-      window.scrollTo(0, 0);
-    } catch (err) {
-      alert("Something went wrong creating your order. Please try again.");
-    } finally {
-      button.disabled = false;
-      button.textContent = "Place Order";
-    }
-  }
-
-  async function submitTransferDetails() {
-    if (!currentOrder) return;
-
-    const transfer = {
-      senderName: getFieldValue("transferSenderName"),
-      senderEmail: getFieldValue("transferSenderEmail"),
-      date: getFieldValue("transferDate"),
-      amount: Number(document.getElementById("transferAmountInput").value),
-      reference: getFieldValue("transferReference"),
-    };
-    const status = document.getElementById("transferStatus");
-
-    if (!transfer.senderName || !transfer.senderEmail || !transfer.date ||
-        !transfer.reference || !Number.isFinite(transfer.amount) || transfer.amount <= 0) {
-      status.className = "transfer-status error";
-      status.textContent = "Please complete all transfer confirmation fields.";
-      return;
-    }
-
-    const button = document.getElementById("submitTransferBtn");
-    button.disabled = true;
-    button.textContent = "Submitting...";
-
-    try {
-      const res = await fetch("/api/orders/" + encodeURIComponent(currentOrder.id) + "/payment", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transfer }),
-      });
-      if (!res.ok) throw new Error("Transfer submission failed");
-
-      status.className = "transfer-status success";
-      status.innerHTML = "Your transfer information has been submitted. " +
-        "We will verify the payment before confirming your order.<br><strong>Order: " +
-        escapeHtml(currentOrder.id) + "</strong>";
-      button.classList.add("hidden");
-    } catch (err) {
-      status.className = "transfer-status error";
-      status.textContent = "Could not submit the transfer information. Please try again.";
-      button.disabled = false;
-      button.textContent = "I Have Sent the Transfer";
-    }
-  }
-</script>
-
-</body>
-</html>
+View remainder of file in raw view
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Community
+Docs
+Contact
+Manage cookies
+Do not share my personal information
