@@ -1,7 +1,8 @@
 # JÉNO member setup
 
-The member system uses PostgreSQL for persistent customer data and Resend for
-verification and password-reset emails.
+The member system uses PostgreSQL for persistent customer data. Email
+verification is currently disabled, so no email provider or custom domain is
+required.
 
 ## 1. Create PostgreSQL on Render
 
@@ -15,29 +16,19 @@ verification and password-reset emails.
 
 The required member tables are created automatically during the next deploy.
 
-## 2. Configure email delivery
+Do not put the database URL or customer passwords in GitHub.
 
-1. Create a Resend account at https://resend.com/.
-2. Verify the domain used for customer email.
-3. Create an API key.
-4. Add these Render environment variables:
-
-   - `RESEND_API_KEY` = the Resend API key
-   - `EMAIL_FROM` = `JÉNO Pâtisserie <orders@your-domain.com>`
-   - `APP_BASE_URL` = `https://jeno-order-system.onrender.com`
-
-Do not put the API key, database URL, or customer passwords in GitHub.
-
-## 3. Deploy and test
+## 2. Deploy and test
 
 1. Deploy the latest GitHub commit.
 2. Open the storefront and select **Sign in → Create account**.
-3. Register with an email address you can access.
-4. Open the verification email and select the verification link.
-5. Sign in, place an order, then open the member account to confirm the order
+3. Register an account. Registration signs the customer in immediately.
+4. Place an order, then open the member account to confirm the order
    appears under **Your orders**.
-6. Test **Forgot password** and its emailed reset link.
-7. Sign in to the administrator page and open the **Members** tab.
+5. Sign in to the administrator page and open the **Members** tab.
+6. To help a customer who forgot their password, select **Reset password**,
+   enter a temporary password with at least eight characters, and give it to
+   the customer privately. All existing member sessions are signed out.
 
 Customers can still check out as guests. Member passwords are stored only as
 one-way scrypt hashes and are never displayed in the administrator page.
