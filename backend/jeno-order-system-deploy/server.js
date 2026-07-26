@@ -500,6 +500,39 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { message: "Member password reset." });
     }
 
+    if (/^\/api\/admin\/members\/[^/]+$/.test(pathname) &&
+        req.method === "DELETE") {
+      if (!requireAdmin(req, res)) return;
+      if (!pool) return sendJson(res, 503, { error: "Member database is not configured." });
+      const memberId = decodeURIComponent(pathname.split("/")[4]);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("DELETE FROM member_sessions WHERE member_id = $1", [memberId]);
+        const result = await client.query(
+          "DELETE FROM members WHERE id = $1 RETURNING id, email",
+          [memberId]
+        );
+        if (!result.rowCount) {
+          await client.query("ROLLBACK");
+          return sendJson(res, 404, { error: "Member not found." });
+        }
+        await client.query("COMMIT");
+        return sendJson(res, 200, {
+          message: "Member deleted.",
+          member: result.rows[0],
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("Delete member error:", error);
+        return sendJson(res, 500, {
+          error: "Member could not be deleted because related database records still exist.",
+        });
+      } finally {
+        client.release();
+      }
+    }
+
 
     // --- API: 取得所有商品 ---
     if (pathname === "/api/products" && req.method === "GET") {
