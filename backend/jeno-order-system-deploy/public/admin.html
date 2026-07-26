@@ -538,7 +538,9 @@
           escapeHtml(member.email) + '</td><td>' + escapeHtml(member.phone) +
           '</td><td>' + new Date(member.created_at).toLocaleString() +
           '</td><td><button class="btn btn-secondary btn-small" onclick="resetMemberPassword(\'' +
-          member.id + '\')">Reset password</button></td></tr>').join("") +
+          member.id + '\')">Reset password</button> ' +
+          '<button class="btn btn-danger btn-small" onclick="deleteMember(\'' +
+          member.id + '\')">Delete</button></td></tr>').join("") +
         '</tbody></table>';
     } catch (error) {
       container.innerHTML = '<p class="empty-msg">Could not load members. Check DATABASE_URL.</p>';
@@ -568,6 +570,28 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Password reset failed.");
       alert("Password reset. Give the temporary password to the member privately.");
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function deleteMember(memberId) {
+    const member = allMembers.find((item) => item.id === memberId);
+    const email = member ? member.email : "this member";
+    if (!confirm(
+      "Delete member " + email + "?\n\n" +
+      "They will no longer be able to sign in. Existing orders will be kept."
+    )) return;
+    if (!confirm("This action cannot be undone. Delete this member permanently?")) return;
+    try {
+      const response = await fetch(
+        "/api/admin/members/" + encodeURIComponent(memberId),
+        { method: "DELETE" }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Could not delete member.");
+      await loadMembers();
+      alert("Member deleted. Existing orders were kept.");
     } catch (error) {
       alert(error.message);
     }
