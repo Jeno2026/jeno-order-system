@@ -874,19 +874,9 @@
         <button class="member-submit" onclick="memberRegister()">Create account</button>
       </div>
       <div class="member-view hidden" id="memberForgotView">
-        <p>Enter your email and we will send you a password reset link.</p>
-        <label for="memberForgotEmail">Email</label>
-        <input id="memberForgotEmail" type="email" autocomplete="email">
-        <button class="member-submit" onclick="memberForgotPassword()">Send reset link</button>
+        <h3>Forgot your password?</h3>
+        <p>Please contact JÉNO and provide the email address used for your account. The store will set a temporary password for you.</p>
         <button class="member-link" onclick="showMemberView('login')">Back to sign in</button>
-      </div>
-      <div class="member-view hidden" id="memberResetView">
-        <p>Choose a new password for your account.</p>
-        <label for="memberResetPassword">New password</label>
-        <input id="memberResetPassword" type="password" autocomplete="new-password">
-        <label for="memberResetConfirm">Confirm new password</label>
-        <input id="memberResetConfirm" type="password" autocomplete="new-password">
-        <button class="member-submit" onclick="memberResetPassword()">Update password</button>
       </div>
     </div>
     <div class="member-view hidden" id="memberAccountView">
@@ -1095,7 +1085,6 @@
   let detailQuantity = 1;
   let currentOrder = null;
   let currentMember = null;
-  let memberResetToken = "";
   const ETRANSFER_EMAIL = "jeno_2026@gmail.com";
   const cakeSizes = [
     { label: '4"', price: 35 },
@@ -1184,8 +1173,6 @@
     memberMessage("");
     if (currentMember) {
       showMemberAccount();
-    } else if (memberResetToken) {
-      showMemberView("reset");
     }
   }
 
@@ -1195,7 +1182,7 @@
   }
 
   function showMemberView(view) {
-    const views = ["Login", "Register", "Forgot", "Reset"];
+    const views = ["Login", "Register", "Forgot"];
     for (const name of views) {
       document.getElementById("member" + name + "View").classList.toggle(
         "hidden", name.toLowerCase() !== view
@@ -1261,7 +1248,9 @@
           password,
         }),
       });
-      showMemberView("login");
+      currentMember = data.member;
+      updateMemberUi();
+      await showMemberAccount();
       memberMessage(data.message, "success");
     } catch (error) {
       memberMessage(error.message, "error");
@@ -1281,39 +1270,6 @@
       updateMemberUi();
       await showMemberAccount();
       memberMessage("Welcome back, " + currentMember.name + ".", "success");
-    } catch (error) {
-      memberMessage(error.message, "error");
-    }
-  }
-
-  async function memberForgotPassword() {
-    try {
-      const data = await memberRequest("/api/members/forgot-password", {
-        method: "POST",
-        body: JSON.stringify({
-          email: document.getElementById("memberForgotEmail").value.trim(),
-        }),
-      });
-      memberMessage(data.message, "success");
-    } catch (error) {
-      memberMessage(error.message, "error");
-    }
-  }
-
-  async function memberResetPassword() {
-    const password = document.getElementById("memberResetPassword").value;
-    if (password !== document.getElementById("memberResetConfirm").value) {
-      return memberMessage("Passwords do not match.", "error");
-    }
-    try {
-      const data = await memberRequest("/api/members/reset-password", {
-        method: "POST",
-        body: JSON.stringify({ token: memberResetToken, password }),
-      });
-      memberResetToken = "";
-      history.replaceState({}, "", location.pathname);
-      showMemberView("login");
-      memberMessage(data.message, "success");
     } catch (error) {
       memberMessage(error.message, "error");
     }
@@ -1485,20 +1441,6 @@
     loadMenu();
     positionCategoryNav();
     await checkMemberSession();
-    const params = new URLSearchParams(location.search);
-    if (params.get("member") === "verified") {
-      openMemberModal();
-      showMemberView("login");
-      memberMessage("Email verified. You can now sign in.", "success");
-    } else if (params.get("member") === "verification-invalid") {
-      openMemberModal();
-      showMemberView("register");
-      memberMessage("This verification link is invalid or expired. Please register again.", "error");
-    } else if (params.get("member") === "reset" && params.get("token")) {
-      memberResetToken = params.get("token");
-      openMemberModal();
-      showMemberView("reset");
-    }
   });
   window.addEventListener("resize", positionCategoryNav);
 

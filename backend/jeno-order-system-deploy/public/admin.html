@@ -533,14 +533,43 @@
         container.innerHTML = '<p class="empty-msg">No members yet.</p>';
         return;
       }
-      container.innerHTML = '<table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Verified</th><th>Joined</th></tr></thead><tbody>' +
+      container.innerHTML = '<table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Joined</th><th></th></tr></thead><tbody>' +
         allMembers.map((member) => '<tr><td>' + escapeHtml(member.name) + '</td><td>' +
           escapeHtml(member.email) + '</td><td>' + escapeHtml(member.phone) +
-          '</td><td>' + (member.verified ? "Yes" : "No") + '</td><td>' +
-          new Date(member.created_at).toLocaleString() + '</td></tr>').join("") +
+          '</td><td>' + new Date(member.created_at).toLocaleString() +
+          '</td><td><button class="btn btn-secondary btn-small" onclick="resetMemberPassword(\'' +
+          member.id + '\')">Reset password</button></td></tr>').join("") +
         '</tbody></table>';
     } catch (error) {
       container.innerHTML = '<p class="empty-msg">Could not load members. Check DATABASE_URL.</p>';
+    }
+  }
+
+  async function resetMemberPassword(memberId) {
+    const member = allMembers.find((item) => item.id === memberId);
+    const email = member ? member.email : "this member";
+    const newPassword = prompt(
+      "Enter a temporary password for " + email + " (at least 8 characters):"
+    );
+    if (newPassword === null) return;
+    if (newPassword.length < 8) {
+      return alert("The temporary password must contain at least 8 characters.");
+    }
+    if (!confirm("Reset this member's password and sign them out on all devices?")) return;
+    try {
+      const response = await fetch(
+        "/api/admin/members/" + encodeURIComponent(memberId) + "/reset-password",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ newPassword }),
+        }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Password reset failed.");
+      alert("Password reset. Give the temporary password to the member privately.");
+    } catch (error) {
+      alert(error.message);
     }
   }
 
