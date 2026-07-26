@@ -794,6 +794,44 @@
     font-weight: 700;
     margin-bottom: 6px;
   }
+  .member-account-tabs {
+    display: flex;
+    gap: 7px;
+    margin-bottom: 20px;
+  }
+  .member-account-tab {
+    flex: 1;
+    border: 1px solid #d8d0c2;
+    border-radius: 7px;
+    background: #f7f3ec;
+    color: #6e6459;
+    padding: 9px 5px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .member-account-tab.active {
+    background: #877d70;
+    color: white;
+  }
+  .site-toast {
+    display: none;
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 150;
+    width: min(420px, calc(100% - 32px));
+    padding: 13px 18px;
+    border-radius: 9px;
+    background: #486146;
+    color: white;
+    text-align: center;
+    font-size: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  }
+  .site-toast.show {
+    display: block;
+  }
   .checkout-member-note {
     border: 1px solid #d8d0c2;
     background: #f7f3ec;
@@ -880,27 +918,42 @@
       </div>
     </div>
     <div class="member-view hidden" id="memberAccountView">
-      <h3>Account information</h3>
-      <label for="memberProfileName">Full name</label>
-      <input id="memberProfileName" autocomplete="name">
-      <label for="memberProfilePhone">Phone</label>
-      <input id="memberProfilePhone" type="tel" autocomplete="tel">
-      <label for="memberProfileEmail">Email</label>
-      <input id="memberProfileEmail" type="email" disabled>
-      <button class="member-submit" onclick="memberSaveProfile()">Save profile</button>
-      <h3>Change password</h3>
-      <label for="memberCurrentPassword">Current password</label>
-      <input id="memberCurrentPassword" type="password" autocomplete="current-password">
-      <label for="memberNewPassword">New password</label>
-      <input id="memberNewPassword" type="password" autocomplete="new-password">
-      <button class="member-secondary" onclick="memberChangePassword()">Change password</button>
-      <h3>Your orders</h3>
-      <div id="memberOrders">Loading orders...</div>
+      <div class="member-account-tabs">
+        <button class="member-account-tab active" id="memberProfileTab"
+          onclick="showAccountSection('profile')">Profile</button>
+        <button class="member-account-tab" id="memberOrdersTab"
+          onclick="showAccountSection('orders')">Orders</button>
+        <button class="member-account-tab" id="memberPasswordTab"
+          onclick="showAccountSection('password')">Password</button>
+      </div>
+      <div id="memberProfileSection">
+        <h3>Account information</h3>
+        <label for="memberProfileName">Full name</label>
+        <input id="memberProfileName" autocomplete="name">
+        <label for="memberProfilePhone">Phone</label>
+        <input id="memberProfilePhone" type="tel" autocomplete="tel">
+        <label for="memberProfileEmail">Email</label>
+        <input id="memberProfileEmail" type="email" disabled>
+        <button class="member-submit" onclick="memberSaveProfile()">Save profile</button>
+      </div>
+      <div class="hidden" id="memberOrdersSection">
+        <h3>Your orders</h3>
+        <div id="memberOrders">Loading orders...</div>
+      </div>
+      <div class="hidden" id="memberPasswordSection">
+        <h3>Change password</h3>
+        <label for="memberCurrentPassword">Current password</label>
+        <input id="memberCurrentPassword" type="password" autocomplete="current-password">
+        <label for="memberNewPassword">New password</label>
+        <input id="memberNewPassword" type="password" autocomplete="new-password">
+        <button class="member-submit" onclick="memberChangePassword()">Change password</button>
+      </div>
       <button class="member-secondary" onclick="memberLogout()">Sign out</button>
     </div>
     <div class="member-message" id="memberMessage"></div>
   </div>
 </div>
+<div class="site-toast" id="siteToast" role="status" aria-live="polite"></div>
 
 <div id="mainView">
 
@@ -1167,6 +1220,14 @@
     box.className = message ? "member-message " + (type || "success") : "member-message";
   }
 
+  function showSiteToast(message) {
+    const toast = document.getElementById("siteToast");
+    toast.textContent = message;
+    toast.classList.add("show");
+    clearTimeout(showSiteToast.timer);
+    showSiteToast.timer = setTimeout(() => toast.classList.remove("show"), 3500);
+  }
+
   function openMemberModal() {
     document.getElementById("memberModal").classList.add("open");
     document.body.style.overflow = "hidden";
@@ -1250,8 +1311,8 @@
       });
       currentMember = data.member;
       updateMemberUi();
-      await showMemberAccount();
-      memberMessage(data.message, "success");
+      closeMemberModal();
+      showSiteToast(data.message);
     } catch (error) {
       memberMessage(error.message, "error");
     }
@@ -1268,8 +1329,8 @@
       });
       currentMember = data.member;
       updateMemberUi();
-      await showMemberAccount();
-      memberMessage("Welcome back, " + currentMember.name + ".", "success");
+      closeMemberModal();
+      showSiteToast("Welcome back, " + currentMember.name + ".");
     } catch (error) {
       memberMessage(error.message, "error");
     }
@@ -1282,12 +1343,25 @@
     document.getElementById("memberProfileName").value = currentMember.name;
     document.getElementById("memberProfilePhone").value = currentMember.phone;
     document.getElementById("memberProfileEmail").value = currentMember.email;
+    showAccountSection("profile");
     try {
       const data = await memberRequest("/api/members/orders");
       renderMemberOrders(data);
     } catch (error) {
       document.getElementById("memberOrders").textContent = error.message;
     }
+  }
+
+  function showAccountSection(section) {
+    for (const name of ["profile", "orders", "password"]) {
+      document.getElementById(
+        "member" + name.charAt(0).toUpperCase() + name.slice(1) + "Section"
+      ).classList.toggle("hidden", name !== section);
+      document.getElementById(
+        "member" + name.charAt(0).toUpperCase() + name.slice(1) + "Tab"
+      ).classList.toggle("active", name === section);
+    }
+    memberMessage("");
   }
 
   function renderMemberOrders(orders) {
