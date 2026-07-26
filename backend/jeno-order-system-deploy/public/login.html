@@ -24,12 +24,11 @@
     border-radius: 14px;
     box-shadow: 0 8px 30px rgba(74, 69, 61, 0.12);
   }
-  h1 {
-    margin: 0 0 6px;
-    font-family: Georgia, serif;
-    text-align: center;
-    letter-spacing: 2px;
-    color: #877d70;
+  .login-logo {
+    display: block;
+    width: min(250px, 82%);
+    height: auto;
+    margin: 0 auto 8px;
   }
   .subtitle {
     margin: 0 0 26px;
@@ -82,7 +81,7 @@
 </head>
 <body>
   <main class="login-card">
-    <h1>JÉNO</h1>
+    <img class="login-logo" src="/images/jeno-logo.png?v=20260725-master" alt="JÉNO Pâtisserie">
     <p class="subtitle">Administrator sign in</p>
     <form id="loginForm">
       <label for="username">Username</label>
