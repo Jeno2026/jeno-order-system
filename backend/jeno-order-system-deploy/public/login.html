@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JÉNO Admin Login</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    margin: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: #f4f1ec;
+    color: #4a453d;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 32px;
+    background: white;
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(74, 69, 61, 0.12);
+  }
+  h1 {
+    margin: 0 0 6px;
+    font-family: Georgia, serif;
+    text-align: center;
+    letter-spacing: 2px;
+    color: #877d70;
+  }
+  .subtitle {
+    margin: 0 0 26px;
+    color: #877d70;
+    text-align: center;
+    font-size: 14px;
+  }
+  label {
+    display: block;
+    margin: 14px 0 6px;
+    color: #6e6459;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  input {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid #d8d0c2;
+    border-radius: 7px;
+    font: inherit;
+  }
+  input:focus {
+    outline: 2px solid #b9ac9c;
+    border-color: #877d70;
+  }
+  button {
+    width: 100%;
+    margin-top: 22px;
+    padding: 12px;
+    border: 0;
+    border-radius: 7px;
+    background: #877d70;
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.65; cursor: wait; }
+  .error {
+    display: none;
+    margin: 14px 0 0;
+    padding: 10px;
+    border-radius: 7px;
+    background: #f8e9e6;
+    color: #8b493e;
+    font-size: 13px;
+  }
+  .error.open { display: block; }
+</style>
+</head>
+<body>
+  <main class="login-card">
+    <h1>JÉNO</h1>
+    <p class="subtitle">Administrator sign in</p>
+    <form id="loginForm">
+      <label for="username">Username</label>
+      <input id="username" name="username" autocomplete="username" required autofocus>
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+      <button id="loginButton" type="submit">Sign In</button>
+      <p class="error" id="loginError" role="alert"></p>
+    </form>
+  </main>
+
+<script>
+  fetch("/api/admin/session", { cache: "no-store" }).then((response) => {
+    if (response.ok) window.location.replace("/admin.html");
+  });
+
+  document.getElementById("loginForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = document.getElementById("loginButton");
+    const error = document.getElementById("loginError");
+    button.disabled = true;
+    button.textContent = "Signing in...";
+    error.classList.remove("open");
+
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: document.getElementById("username").value,
+          password: document.getElementById("password").value,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to sign in.");
+      window.location.replace("/admin.html");
+    } catch (err) {
+      error.textContent = err.message;
+      error.classList.add("open");
+      button.disabled = false;
+      button.textContent = "Sign In";
+    }
+  });
+</script>
+</body>
+</html>

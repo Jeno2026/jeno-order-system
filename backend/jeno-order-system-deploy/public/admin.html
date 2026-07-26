@@ -19,6 +19,7 @@
     background: #877d70;
     color: white;
     padding: 18px 24px;
+    position: relative;
   }
   .admin-header h1 {
     margin: 0;
@@ -28,6 +29,19 @@
     margin: 4px 0 0 0;
     font-size: 13px;
     opacity: 0.85;
+  }
+  .logout-btn {
+    position: absolute;
+    right: 24px;
+    top: 20px;
+    padding: 7px 12px;
+    border: 1px solid rgba(255,255,255,0.55);
+    border-radius: 6px;
+    background: transparent;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
   }
   .admin-content {
     max-width: 900px;
@@ -61,12 +75,17 @@
     margin-bottom: 4px;
     font-weight: 600;
   }
-  input, select {
+  input, select, textarea {
     width: 100%;
     padding: 8px 10px;
     border: 1px solid #d8d0c2;
     border-radius: 6px;
     font-size: 14px;
+    font-family: inherit;
+  }
+  textarea {
+    min-height: 70px;
+    resize: vertical;
   }
   .btn {
     padding: 9px 18px;
@@ -172,6 +191,21 @@
     gap: 12px;
     margin-bottom: 14px;
   }
+  .order-toolbar-actions, .order-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .order-card-actions { margin-top: 12px; }
+  .order-editor {
+    display: none;
+    margin-bottom: 18px;
+    padding: 16px;
+    background: #f7f3ec;
+    border-radius: 8px;
+  }
+  .order-editor.open { display: block; }
+  .order-editor h3 { margin: 0 0 14px; font-size: 15px; }
   .order-card {
     border: 1px solid #e6e0d6;
     border-radius: 8px;
@@ -304,29 +338,66 @@
 </head>
 <body>
 
+
 <div class="admin-header">
   <h1>JÉNO Pâtisserie &amp; Café — Admin</h1>
   <p>Manage your menu items</p>
+  <button class="logout-btn" onclick="logoutAdmin()">Sign Out</button>
 </div>
 
+
 <div class="admin-content">
+
 
   <div class="admin-tabs">
     <button class="btn tab-btn active" id="ordersTab" onclick="showView('orders')">Orders</button>
     <button class="btn tab-btn" id="productsTab" onclick="showView('products')">Products</button>
   </div>
 
+
   <div class="admin-view active" id="ordersView">
     <div class="panel">
       <div class="order-toolbar">
         <h2>Orders</h2>
-        <button class="btn btn-primary btn-small" onclick="loadOrders()">Refresh</button>
+        <div class="order-toolbar-actions">
+          <button class="btn btn-secondary btn-small" onclick="openOrderEditor()">Add Order</button>
+          <button class="btn btn-secondary btn-small" onclick="exportOrdersCsv()">Export Excel</button>
+          <button class="btn btn-primary btn-small" onclick="loadOrders()">Refresh</button>
+        </div>
+      </div>
+      <div class="order-editor" id="orderEditor">
+        <h3 id="orderEditorTitle">Add Order</h3>
+        <div class="form-row">
+          <div><label for="orderCustomerName">Customer name</label><input id="orderCustomerName"></div>
+          <div><label for="orderCustomerPhone">Phone</label><input id="orderCustomerPhone"></div>
+        </div>
+        <div class="form-row">
+          <div><label for="orderCustomerEmail">Email</label><input id="orderCustomerEmail" type="email"></div>
+          <div><label for="orderStatus">Status</label><select id="orderStatus"></select></div>
+        </div>
+        <div class="form-row full">
+          <div><label for="orderItemsText">Items — one per line: Name | Quantity | Unit price</label><textarea id="orderItemsText" placeholder='Chocolate Cake — 4&quot; | 1 | 35.00'></textarea></div>
+        </div>
+        <div class="form-row">
+          <div><label for="orderFulfillmentMethod">Fulfillment</label><select id="orderFulfillmentMethod"><option value="pickup">Pickup</option><option value="delivery">Delivery</option></select></div>
+          <div><label for="orderFulfillmentDate">Date</label><input id="orderFulfillmentDate" type="date"></div>
+        </div>
+        <div class="form-row">
+          <div><label for="orderFulfillmentTime">Time</label><input id="orderFulfillmentTime" type="time"></div>
+          <div><label for="orderAddress">Address</label><input id="orderAddress"></div>
+        </div>
+        <div class="form-row full"><div><label for="orderNotes">Notes</label><textarea id="orderNotes"></textarea></div></div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="saveOrder()">Save Order</button>
+          <button class="btn btn-secondary" onclick="closeOrderEditor()">Cancel</button>
+        </div>
       </div>
       <div id="orderListContainer">
         <p class="empty-msg">Loading orders...</p>
       </div>
     </div>
   </div>
+
 
   <div class="admin-view" id="productsView">
   <div class="panel" id="productFormPanel">
@@ -366,11 +437,13 @@
       </div>
     </div>
 
+
     <div class="variant-header">
       <h3>Subcategories and prices</h3>
       <button class="btn btn-secondary btn-small" type="button" onclick="addVariantRow()">+ Add subcategory</button>
     </div>
     <div id="variantRows"></div>
+
 
     <div class="form-actions">
       <button class="btn btn-primary" id="saveProductButton" onclick="saveProduct()">Add Product</button>
@@ -378,6 +451,7 @@
     </div>
     <p class="status-msg" id="addStatusMsg"></p>
   </div>
+
 
   <div class="panel">
     <h2>Current Menu</h2>
@@ -387,12 +461,29 @@
   </div>
   </div>
 
+
 </div>
 
+
 <script>
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async function(...args) {
+    const response = await nativeFetch(...args);
+    if (response.status === 401) {
+      window.location.replace("/login.html");
+    }
+    return response;
+  };
+
+  async function logoutAdmin() {
+    await nativeFetch("/api/admin/logout", { method: "POST" });
+    window.location.replace("/login.html");
+  }
+
   let allProducts = [];
   let allOrders = [];
   let editingProductId = null;
+  let editingOrderId = null;
   const orderStatuses = [
     ["awaiting_transfer", "Awaiting Transfer"],
     ["transfer_submitted", "Transfer Submitted"],
@@ -404,6 +495,7 @@
     ["received", "Received (Legacy)"],
   ];
 
+
   function showView(view) {
     document.getElementById("ordersView").classList.toggle("active", view === "orders");
     document.getElementById("productsView").classList.toggle("active", view === "products");
@@ -411,9 +503,11 @@
     document.getElementById("productsTab").classList.toggle("active", view === "products");
   }
 
+
   async function loadOrders() {
     const container = document.getElementById("orderListContainer");
     container.innerHTML = '<p class="empty-msg">Loading orders...</p>';
+
 
     try {
       const res = await fetch("/api/orders");
@@ -425,17 +519,21 @@
     }
   }
 
+
   function renderOrders() {
     const container = document.getElementById("orderListContainer");
+
 
     if (allOrders.length === 0) {
       container.innerHTML = '<p class="empty-msg">No orders yet.</p>';
       return;
     }
 
+
     const sortedOrders = [...allOrders].sort((a, b) =>
       new Date(b.createdAt) - new Date(a.createdAt)
     );
+
 
     container.innerHTML = sortedOrders.map((order) => {
       const items = Object.values(order.items || {}).map((item) => {
@@ -446,10 +544,12 @@
           '</span><span>$' + (price * qty).toFixed(2) + "</span></div>";
       }).join("");
 
+
       const options = orderStatuses.map(([value, label]) =>
         '<option value="' + value + '"' +
         (order.status === value ? " selected" : "") + ">" + label + "</option>"
       ).join("");
+
 
       const customer = order.customer || {};
       const fulfillment = order.fulfillment || {};
@@ -476,6 +576,7 @@
           "Reference: " + escapeHtml(payment.reference || "") + "</div>"
         : '<div class="order-details-block"><strong>Payment</strong>Waiting for e-Transfer information.</div>';
 
+
       return '<article class="order-card">' +
         '<div class="order-heading"><span class="order-id">' +
         escapeHtml(order.id) + '</span><time class="order-time">' +
@@ -486,9 +587,15 @@
         '<div class="order-footer"><span class="order-total">Total: $' +
         Number(order.total || 0).toFixed(2) + '</span><select class="status-select" ' +
         'aria-label="Order status" onchange="updateOrderStatus(\'' +
-        encodeURIComponent(order.id) + "', this)\">" + options + "</select></div></article>";
+        encodeURIComponent(order.id) + "', this)\">" + options + "</select></div>" +
+        '<div class="order-card-actions">' +
+        '<button class="btn btn-secondary btn-small" onclick="openOrderEditor(\'' +
+        encodeURIComponent(order.id) + '\')">Edit</button>' +
+        '<button class="btn btn-danger btn-small" onclick="deleteOrder(\'' +
+        encodeURIComponent(order.id) + '\')">Delete</button></div></article>';
     }).join("");
   }
+
 
   async function updateOrderStatus(encodedId, select) {
     select.disabled = true;
@@ -508,6 +615,125 @@
     }
   }
 
+  function openOrderEditor(encodedId) {
+    editingOrderId = encodedId ? decodeURIComponent(encodedId) : null;
+    const order = editingOrderId ? allOrders.find((item) => item.id === editingOrderId) : null;
+    const customer = order?.customer || {};
+    const fulfillment = order?.fulfillment || {};
+    document.getElementById("orderEditorTitle").textContent =
+      order ? "Edit Order " + order.id : "Add Order";
+    document.getElementById("orderCustomerName").value = customer.name || "";
+    document.getElementById("orderCustomerPhone").value = customer.phone || "";
+    document.getElementById("orderCustomerEmail").value = customer.email || "";
+    document.getElementById("orderItemsText").value = Object.values(order?.items || {}).map((item) =>
+      (item.name || "Item") + " | " + (Number(item.qty) || 1) +
+      " | " + (Number(item.price) || 0).toFixed(2)
+    ).join("\n");
+    document.getElementById("orderFulfillmentMethod").value = fulfillment.method || "pickup";
+    document.getElementById("orderFulfillmentDate").value = fulfillment.date || "";
+    document.getElementById("orderFulfillmentTime").value = fulfillment.time || "";
+    document.getElementById("orderAddress").value = fulfillment.address || "";
+    document.getElementById("orderNotes").value = fulfillment.notes || "";
+    document.getElementById("orderStatus").innerHTML = orderStatuses.map(([value, label]) =>
+      '<option value="' + value + '"' + (value === (order?.status || "awaiting_transfer") ? " selected" : "") +
+      ">" + label + "</option>"
+    ).join("");
+    document.getElementById("orderEditor").classList.add("open");
+  }
+
+  function closeOrderEditor() {
+    editingOrderId = null;
+    document.getElementById("orderEditor").classList.remove("open");
+  }
+
+  async function saveOrder() {
+    const parsedItems = document.getElementById("orderItemsText").value.split("\n")
+      .map((line) => line.trim()).filter(Boolean).map((line) => {
+        const parts = line.split("|").map((part) => part.trim());
+        return { name: parts[0], qty: Number(parts[1]), price: Number(parts[2]) };
+      });
+    const customer = {
+      name: document.getElementById("orderCustomerName").value.trim(),
+      phone: document.getElementById("orderCustomerPhone").value.trim(),
+      email: document.getElementById("orderCustomerEmail").value.trim(),
+    };
+    const fulfillment = {
+      method: document.getElementById("orderFulfillmentMethod").value,
+      date: document.getElementById("orderFulfillmentDate").value,
+      time: document.getElementById("orderFulfillmentTime").value,
+      address: document.getElementById("orderAddress").value.trim(),
+      notes: document.getElementById("orderNotes").value.trim(),
+    };
+    if (!customer.name || !customer.phone || !customer.email || !fulfillment.date ||
+        !parsedItems.length || parsedItems.some((item) =>
+          !item.name || !Number.isInteger(item.qty) || item.qty < 1 ||
+          !Number.isFinite(item.price) || item.price < 0)) {
+      alert("Complete the customer, date, and items using: Name | Quantity | Unit price");
+      return;
+    }
+    const items = {};
+    parsedItems.forEach((item, index) => { items["manual_item_" + index] = item; });
+    const payload = {
+      customer, fulfillment, items,
+      total: parsedItems.reduce((sum, item) => sum + item.price * item.qty, 0),
+      paymentMethod: "etransfer",
+      status: document.getElementById("orderStatus").value,
+    };
+    try {
+      const res = await fetch(editingOrderId
+        ? "/api/orders/" + encodeURIComponent(editingOrderId) : "/api/orders", {
+        method: editingOrderId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error();
+      closeOrderEditor();
+      await loadOrders();
+    } catch (err) { alert("Could not save the order."); }
+  }
+
+  async function deleteOrder(encodedId) {
+    const id = decodeURIComponent(encodedId);
+    if (!confirm("Delete order " + id + "? This cannot be undone.")) return;
+    try {
+      const res = await fetch("/api/orders/" + encodeURIComponent(id), { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      await loadOrders();
+    } catch (err) { alert("Could not delete the order."); }
+  }
+
+  function csvCell(value) {
+    let text = value == null ? "" : String(value);
+    if (/^[=+\-@]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  }
+
+  function exportOrdersCsv() {
+    if (!allOrders.length) return alert("There are no orders to export.");
+    const headers = ["Order ID","Created At","Status","Customer","Phone","Email","Items",
+      "Total","Fulfillment","Date","Time","Address","Notes","Transfer Sender",
+      "Transfer Email","Transfer Date","Transfer Amount","Transfer Reference"];
+    const rows = allOrders.map((order) => {
+      const customer = order.customer || {}, fulfillment = order.fulfillment || {};
+      const payment = order.payment || {};
+      const items = Object.values(order.items || {}).map((item) =>
+        (item.name || "Item") + " × " + (Number(item.qty) || 0) +
+        " @ $" + (Number(item.price) || 0).toFixed(2)).join("; ");
+      return [order.id,order.createdAt,order.status,customer.name,customer.phone,customer.email,
+        items,Number(order.total || 0).toFixed(2),fulfillment.method,fulfillment.date,
+        fulfillment.time,fulfillment.address,fulfillment.notes,payment.senderName,
+        payment.senderEmail,payment.date,payment.amount == null ? "" :
+        Number(payment.amount).toFixed(2),payment.reference];
+    });
+    const csv = "\uFEFF" + [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    link.download = "jeno-orders-" + new Date().toISOString().slice(0, 10) + ".csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+
   // ---------- 讀取商品清單 ----------
   async function loadProducts() {
     try {
@@ -520,14 +746,17 @@
     }
   }
 
+
   // ---------- 依分類渲染商品清單 ----------
   function renderProductList() {
     const container = document.getElementById("productListContainer");
+
 
     if (allProducts.length === 0) {
       container.innerHTML = '<p class="empty-msg">No products yet.</p>';
       return;
     }
+
 
     // 依 category 分組
     const groups = {};
@@ -536,11 +765,13 @@
       groups[p.category].push(p);
     }
 
+
     let html = "";
     for (const category in groups) {
       html += '<div class="category-group">';
       html += "<h3>" + escapeHtml(category) + "</h3>";
       html += "<table><thead><tr><th>Name</th><th>Price</th><th></th></tr></thead><tbody>";
+
 
       for (const p of groups[category]) {
         html += "<tr>";
@@ -558,11 +789,14 @@
         html += "</tr>";
       }
 
+
       html += "</tbody></table></div>";
     }
 
+
     container.innerHTML = html;
   }
+
 
   // 避免商品名稱裡有特殊字元(例如 <script>)破壞頁面結構
   function escapeHtml(str) {
@@ -570,6 +804,7 @@
     div.innerText = str;
     return div.innerHTML;
   }
+
 
   function categoryDefaults(category) {
     if (category === "Cakes") {
@@ -588,6 +823,7 @@
     return [{ label: "Individual", price: "" }];
   }
 
+
   function renderVariantRows(options) {
     const rows = options && options.length
       ? options
@@ -605,6 +841,7 @@
     ).join("");
   }
 
+
   function addVariantRow() {
     const wrapper = document.createElement("div");
     wrapper.className = "variant-row";
@@ -615,6 +852,7 @@
     document.getElementById("variantRows").appendChild(wrapper);
   }
 
+
   function removeVariantRow(button) {
     const rows = document.querySelectorAll(".variant-row");
     if (rows.length === 1) {
@@ -624,9 +862,11 @@
     button.closest(".variant-row").remove();
   }
 
+
   function handleCategoryChange() {
     renderVariantRows(categoryDefaults(document.getElementById("productCategory").value));
   }
+
 
   function getFormOptions() {
     const rows = [...document.querySelectorAll(".variant-row")];
@@ -641,10 +881,12 @@
     });
   }
 
+
   function slugOption(label, index) {
     const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     return slug || "option-" + (index + 1);
   }
+
 
   function escapeAttr(value) {
     return String(value)
@@ -654,15 +896,18 @@
       .replace(/>/g, "&gt;");
   }
 
+
   function optionTypeForCategory(category) {
     if (category === "Cakes") return "size";
     if (category === "Cinnamon Rolls") return "pack";
     return "quantity";
   }
 
+
   async function uploadProductImage(input) {
     const file = input.files && input.files[0];
     if (!file) return;
+
 
     const allowedTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
     if (!allowedTypes.includes(file.type)) {
@@ -676,6 +921,7 @@
       return;
     }
 
+
     showAddStatus("Uploading image...", "success");
     try {
       const data = await readFileAsDataUrl(file);
@@ -686,6 +932,7 @@
       });
       if (!res.ok) throw new Error("Upload failed");
 
+
       const result = await res.json();
       document.getElementById("productImage").value = result.image;
       showImagePreview(result.image);
@@ -695,6 +942,7 @@
     }
   }
 
+
   function readFileAsDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -703,6 +951,7 @@
       reader.readAsDataURL(file);
     });
   }
+
 
   function showImagePreview(src) {
     const preview = document.getElementById("productImagePreview");
@@ -715,12 +964,14 @@
     preview.style.display = "block";
   }
 
+
   function emojiForCategory(category) {
     if (category === "Cakes") return "🍰";
     if (category === "Cinnamon Rolls") return "🌀";
     if (category === "Tiramisu") return "🍮";
     return "🍽️";
   }
+
 
   async function saveProduct() {
     const category = document.getElementById("productCategory").value;
@@ -735,6 +986,7 @@
       : emojiForCategory(category);
     const options = getFormOptions();
 
+
     if (!name) {
       showAddStatus("Please enter a product name.", "error");
       return;
@@ -743,6 +995,7 @@
       showAddStatus("Every subcategory needs a name and valid price.", "error");
       return;
     }
+
 
     const payload = {
       category,
@@ -757,9 +1010,11 @@
         : options,
     };
 
+
     const url = editingProductId
       ? "/api/products/" + editingProductId
       : "/api/products";
+
 
     try {
       const res = await fetch(url, {
@@ -769,6 +1024,7 @@
       });
       if (!res.ok) throw new Error("Request failed");
 
+
       showAddStatus(editingProductId ? "Product updated!" : "Product added!", "success");
       resetProductForm();
       await loadProducts();
@@ -776,6 +1032,7 @@
       showAddStatus("Something went wrong. Please try again.", "error");
     }
   }
+
 
   function showAddStatus(message, type) {
     const el = document.getElementById("addStatusMsg");
@@ -785,10 +1042,12 @@
     setTimeout(() => { el.style.display = "none"; }, 2500);
   }
 
+
   // ---------- 把商品資料帶回完整表單編輯 ----------
   function startEdit(id) {
     const product = allProducts.find((p) => p.id === id);
     if (!product) return;
+
 
     editingProductId = id;
     document.getElementById("productFormTitle").innerText = "Edit Product";
@@ -808,6 +1067,7 @@
     document.getElementById("productFormPanel").scrollIntoView({ behavior: "smooth" });
   }
 
+
   function resetProductForm() {
     editingProductId = null;
     document.getElementById("productFormTitle").innerText = "Add a New Product";
@@ -822,13 +1082,16 @@
     renderVariantRows(categoryDefaults("Cakes"));
   }
 
+
   // ---------- 刪除商品 ----------
   async function deleteProduct(id) {
     const product = allProducts.find((p) => p.id === id);
     if (!product) return;
 
+
     const confirmed = confirm('Delete "' + product.name + '"? This cannot be undone.');
     if (!confirmed) return;
+
 
     try {
       const res = await fetch("/api/products/" + id, { method: "DELETE" });
@@ -839,10 +1102,12 @@
     }
   }
 
+
   loadOrders();
   loadProducts();
   resetProductForm();
 </script>
+
 
 </body>
 </html>
