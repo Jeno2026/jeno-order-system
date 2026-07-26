@@ -8,6 +8,8 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const https = require("https");
+const { Pool } = require("pg");
 
 
 const PORT = process.env.PORT || 3000;
@@ -24,6 +26,17 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 const ADMIN_SESSION_HOURS = 12;
 const adminSessions = new Map();
 const loginAttempts = new Map();
+const MEMBER_SESSION_DAYS = 30;
+const DATABASE_URL = process.env.DATABASE_URL || "";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const EMAIL_FROM = process.env.EMAIL_FROM || "";
+const APP_BASE_URL = (process.env.APP_BASE_URL || "").replace(/\/+$/, "");
+const pool = DATABASE_URL
+  ? new Pool({
+      connectionString: DATABASE_URL,
+      ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
+    })
+  : null;
 
 
 // ---------- 小工具函式 ----------
@@ -96,6 +109,132 @@ function loginAttemptKey(req) {
     .split(",")[0].trim();
 }
 
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function validEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
+}
+
+function hashToken(token) {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
+}
+
+function hashPassword(password) {
+  return new Promise((resolve, reject) => {
+    const salt = crypto.randomBytes(16);
+    crypto.scrypt(String(password), salt, 64, (error, derivedKey) => {
+      if (error) return reject(error);
+      resolve("scrypt$" + salt.toString("hex") + "$" + derivedKey.toString("hex"));
+    });
+  });
+}
+
+function verifyPassword(password, storedHash) {
+  return new Promise((resolve) => {
+    const parts = String(storedHash || "").split("$");
+    if (parts.length !== 3 || parts[0] !== "scrypt") return resolve(false);
+    crypto.scrypt(String(password), Buffer.from(parts[1], "hex"), 64, (error, derivedKey) => {
+      if (error) return resolve(false);
+      const expected = Buffer.from(parts[2], "hex");
+      resolve(expected.length === derivedKey.length && crypto.timingSafeEqual(expected, derivedKey));
+    });
+  });
+}
+
+async function initializeMemberDatabase() {
+  if (!pool) {
+    console.warn("DATABASE_URL is not set. Member features are disabled.");
+    return;
+  }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS members (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      phone TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      verified BOOLEAN NOT NULL DEFAULT FALSE,
+      verification_token_hash TEXT,
+      verification_expires TIMESTAMPTZ,
+      reset_token_hash TEXT,
+      reset_expires TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS member_sessions (
+      token_hash TEXT PRIMARY KEY,
+      member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS member_sessions_member_id_idx
+      ON member_sessions(member_id);
+  `);
+  await pool.query("DELETE FROM member_sessions WHERE expires_at <= NOW()");
+}
+
+function memberCookie(token, maxAge) {
+  return "jeno_member_session=" + encodeURIComponent(token || "") +
+    "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=" + maxAge;
+}
+
+async function getMemberSession(req) {
+  if (!pool) return null;
+  const token = parseCookies(req).jeno_member_session;
+  if (!token) return null;
+  const result = await pool.query(
+    `SELECT m.id, m.name, m.email, m.phone, m.verified
+       FROM member_sessions s
+       JOIN members m ON m.id = s.member_id
+      WHERE s.token_hash = $1 AND s.expires_at > NOW()`,
+    [hashToken(token)]
+  );
+  return result.rows[0] || null;
+}
+
+async function requireMember(req, res) {
+  const member = await getMemberSession(req);
+  if (member) return member;
+  sendJson(res, 401, { error: "Member login required." });
+  return null;
+}
+
+function requestOrigin(req) {
+  if (APP_BASE_URL) return APP_BASE_URL;
+  const protocol = req.headers["x-forwarded-proto"] || "https";
+  return protocol + "://" + req.headers.host;
+}
+
+function sendEmail({ to, subject, html }) {
+  if (!RESEND_API_KEY || !EMAIL_FROM) {
+    return Promise.reject(new Error("Email service is not configured."));
+  }
+  const payload = JSON.stringify({ from: EMAIL_FROM, to: [to], subject, html });
+  return new Promise((resolve, reject) => {
+    const request = https.request({
+      hostname: "api.resend.com",
+      path: "/emails",
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + RESEND_API_KEY,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(payload),
+      },
+    }, (response) => {
+      let responseBody = "";
+      response.on("data", (chunk) => responseBody += chunk);
+      response.on("end", () => {
+        if (response.statusCode >= 200 && response.statusCode < 300) return resolve();
+        reject(new Error("Email delivery failed: " + response.statusCode + " " + responseBody));
+      });
+    });
+    request.on("error", reject);
+    request.end(payload);
+  });
+}
+
 
 // 讀取 POST 請求的內容(request body)
 function readRequestBody(req) {
@@ -149,6 +288,228 @@ const server = http.createServer(async (req, res) => {
     // 部署平台可用此端點確認服務仍正常運作
     if (pathname === "/health" && req.method === "GET") {
       return sendJson(res, 200, { status: "ok" });
+    }
+
+    // --- 顧客會員系統 ---
+    if (pathname.startsWith("/api/members/") && !pool) {
+      return sendJson(res, 503, {
+        error: "Member service is not configured. Set DATABASE_URL.",
+      });
+    }
+
+    if (pathname === "/api/members/register" && req.method === "POST") {
+      if (!RESEND_API_KEY || !EMAIL_FROM) {
+        return sendJson(res, 503, {
+          error: "Email service is not configured. Set RESEND_API_KEY and EMAIL_FROM.",
+        });
+      }
+      const body = await readRequestBody(req);
+      const name = String(body.name || "").trim();
+      const phone = String(body.phone || "").trim();
+      const email = normalizeEmail(body.email);
+      const password = String(body.password || "");
+      if (!name || !phone || !validEmail(email) || password.length < 8) {
+        return sendJson(res, 400, {
+          error: "Name, phone, a valid email, and a password of at least 8 characters are required.",
+        });
+      }
+      const existing = await pool.query("SELECT id, verified FROM members WHERE email = $1", [email]);
+      if (existing.rows[0] && existing.rows[0].verified) {
+        return sendJson(res, 409, { error: "An account already exists for this email." });
+      }
+      const verificationToken = crypto.randomBytes(32).toString("hex");
+      const passwordHash = await hashPassword(password);
+      const id = existing.rows[0] ? existing.rows[0].id : "member_" + crypto.randomUUID();
+      await pool.query(`
+        INSERT INTO members
+          (id, name, email, phone, password_hash, verified,
+           verification_token_hash, verification_expires, updated_at)
+        VALUES ($1, $2, $3, $4, $5, FALSE, $6, NOW() + INTERVAL '24 hours', NOW())
+        ON CONFLICT (email) DO UPDATE SET
+          name = EXCLUDED.name,
+          phone = EXCLUDED.phone,
+          password_hash = EXCLUDED.password_hash,
+          verification_token_hash = EXCLUDED.verification_token_hash,
+          verification_expires = EXCLUDED.verification_expires,
+          updated_at = NOW()
+      `, [id, name, email, phone, passwordHash, hashToken(verificationToken)]);
+      const verifyUrl = requestOrigin(req) + "/api/members/verify?token=" +
+        encodeURIComponent(verificationToken);
+      try {
+        await sendEmail({
+          to: email,
+          subject: "Verify your JÉNO account",
+          html: `<h2>Welcome to JÉNO</h2>
+            <p>Hello ${name.replace(/[<>&"]/g, "")},</p>
+            <p>Please verify your email address to activate your account.</p>
+            <p><a href="${verifyUrl}">Verify my email</a></p>
+            <p>This link expires in 24 hours.</p>`,
+        });
+      } catch (error) {
+        console.error("Verification email error:", error.message);
+        return sendJson(res, 502, { error: "We could not send the verification email. Please try again." });
+      }
+      return sendJson(res, 201, {
+        message: "Account created. Check your email to verify your account.",
+      });
+    }
+
+    if (pathname === "/api/members/verify" && req.method === "GET") {
+      const token = String(url.searchParams.get("token") || "");
+      const result = await pool.query(`
+        UPDATE members
+           SET verified = TRUE, verification_token_hash = NULL,
+               verification_expires = NULL, updated_at = NOW()
+         WHERE verification_token_hash = $1
+           AND verification_expires > NOW()
+        RETURNING id
+      `, [hashToken(token)]);
+      return redirect(res, result.rowCount ? "/?member=verified" : "/?member=verification-invalid");
+    }
+
+    if (pathname === "/api/members/login" && req.method === "POST") {
+      const body = await readRequestBody(req);
+      const email = normalizeEmail(body.email);
+      const result = await pool.query(
+        "SELECT id, name, email, phone, password_hash, verified FROM members WHERE email = $1",
+        [email]
+      );
+      const member = result.rows[0];
+      if (!member || !(await verifyPassword(body.password, member.password_hash))) {
+        return sendJson(res, 401, { error: "Incorrect email or password." });
+      }
+      if (!member.verified) {
+        return sendJson(res, 403, { error: "Please verify your email before signing in." });
+      }
+      const token = crypto.randomBytes(32).toString("hex");
+      await pool.query(
+        "INSERT INTO member_sessions (token_hash, member_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL '30 days')",
+        [hashToken(token), member.id]
+      );
+      res.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Set-Cookie": memberCookie(token, MEMBER_SESSION_DAYS * 24 * 60 * 60),
+        "Cache-Control": "no-store",
+      });
+      return res.end(JSON.stringify({
+        authenticated: true,
+        member: { id: member.id, name: member.name, email: member.email, phone: member.phone },
+      }));
+    }
+
+    if (pathname === "/api/members/session" && req.method === "GET") {
+      const member = await getMemberSession(req);
+      return sendJson(res, member ? 200 : 401, {
+        authenticated: Boolean(member),
+        member: member || undefined,
+      });
+    }
+
+    if (pathname === "/api/members/logout" && req.method === "POST") {
+      const token = parseCookies(req).jeno_member_session;
+      if (token) await pool.query("DELETE FROM member_sessions WHERE token_hash = $1", [hashToken(token)]);
+      res.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Set-Cookie": memberCookie("", 0),
+        "Cache-Control": "no-store",
+      });
+      return res.end(JSON.stringify({ authenticated: false }));
+    }
+
+    if (pathname === "/api/members/forgot-password" && req.method === "POST") {
+      const body = await readRequestBody(req);
+      const email = normalizeEmail(body.email);
+      const result = await pool.query("SELECT id, name FROM members WHERE email = $1 AND verified = TRUE", [email]);
+      if (result.rows[0] && RESEND_API_KEY && EMAIL_FROM) {
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        await pool.query(`
+          UPDATE members SET reset_token_hash = $1,
+            reset_expires = NOW() + INTERVAL '1 hour', updated_at = NOW()
+          WHERE id = $2
+        `, [hashToken(resetToken), result.rows[0].id]);
+        const resetUrl = requestOrigin(req) + "/?member=reset&token=" + encodeURIComponent(resetToken);
+        try {
+          await sendEmail({
+            to: email,
+            subject: "Reset your JÉNO password",
+            html: `<h2>Reset your JÉNO password</h2>
+              <p>Use the link below to choose a new password.</p>
+              <p><a href="${resetUrl}">Reset my password</a></p>
+              <p>This link expires in one hour.</p>`,
+          });
+        } catch (error) {
+          console.error("Password reset email error:", error.message);
+        }
+      }
+      return sendJson(res, 200, {
+        message: "If the account exists, a password reset email has been sent.",
+      });
+    }
+
+    if (pathname === "/api/members/reset-password" && req.method === "POST") {
+      const body = await readRequestBody(req);
+      if (String(body.password || "").length < 8) {
+        return sendJson(res, 400, { error: "Password must contain at least 8 characters." });
+      }
+      const result = await pool.query(`
+        SELECT id FROM members
+         WHERE reset_token_hash = $1 AND reset_expires > NOW()
+      `, [hashToken(body.token)]);
+      if (!result.rows[0]) return sendJson(res, 400, { error: "This reset link is invalid or expired." });
+      const passwordHash = await hashPassword(body.password);
+      await pool.query(`
+        UPDATE members SET password_hash = $1, reset_token_hash = NULL,
+          reset_expires = NULL, updated_at = NOW() WHERE id = $2
+      `, [passwordHash, result.rows[0].id]);
+      await pool.query("DELETE FROM member_sessions WHERE member_id = $1", [result.rows[0].id]);
+      return sendJson(res, 200, { message: "Password updated. You can now sign in." });
+    }
+
+    if (pathname === "/api/members/profile" && req.method === "GET") {
+      const member = await requireMember(req, res);
+      if (!member) return;
+      return sendJson(res, 200, { member });
+    }
+
+    if (pathname === "/api/members/profile" && req.method === "PUT") {
+      const member = await requireMember(req, res);
+      if (!member) return;
+      const body = await readRequestBody(req);
+      const name = String(body.name || "").trim();
+      const phone = String(body.phone || "").trim();
+      if (!name || !phone) return sendJson(res, 400, { error: "Name and phone are required." });
+      const result = await pool.query(`
+        UPDATE members SET name = $1, phone = $2, updated_at = NOW()
+         WHERE id = $3 RETURNING id, name, email, phone, verified
+      `, [name, phone, member.id]);
+      return sendJson(res, 200, { member: result.rows[0] });
+    }
+
+    if (pathname === "/api/members/password" && req.method === "PUT") {
+      const member = await requireMember(req, res);
+      if (!member) return;
+      const body = await readRequestBody(req);
+      if (String(body.newPassword || "").length < 8) {
+        return sendJson(res, 400, { error: "New password must contain at least 8 characters." });
+      }
+      const result = await pool.query("SELECT password_hash FROM members WHERE id = $1", [member.id]);
+      if (!(await verifyPassword(body.currentPassword, result.rows[0].password_hash))) {
+        return sendJson(res, 401, { error: "Current password is incorrect." });
+      }
+      const passwordHash = await hashPassword(body.newPassword);
+      await pool.query("UPDATE members SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+        [passwordHash, member.id]);
+      return sendJson(res, 200, { message: "Password updated." });
+    }
+
+    if (pathname === "/api/members/orders" && req.method === "GET") {
+      const member = await requireMember(req, res);
+      if (!member) return;
+      const orders = readJsonFile(ORDERS_FILE).filter((order) =>
+        order.memberId === member.id ||
+        normalizeEmail(order.customer && order.customer.email) === member.email
+      );
+      return sendJson(res, 200, orders.reverse());
     }
 
     // --- 管理員登入 ---
@@ -214,6 +575,16 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === "/admin.html" && req.method === "GET" && !getAdminSession(req)) {
       return redirect(res, "/login.html");
+    }
+
+    if (pathname === "/api/admin/members" && req.method === "GET") {
+      if (!requireAdmin(req, res)) return;
+      if (!pool) return sendJson(res, 503, { error: "Member database is not configured." });
+      const result = await pool.query(`
+        SELECT id, name, email, phone, verified, created_at, updated_at
+          FROM members ORDER BY created_at DESC
+      `);
+      return sendJson(res, 200, result.rows);
     }
 
 
@@ -369,6 +740,7 @@ const server = http.createServer(async (req, res) => {
     // --- API: 建立新訂單 ---
     if (pathname === "/api/orders" && req.method === "POST") {
       const body = await readRequestBody(req);
+      const orderingMember = await getMemberSession(req);
 
 
       // 基本驗證:確認有帶商品清單,而且不是空的
@@ -401,6 +773,7 @@ const server = http.createServer(async (req, res) => {
         fulfillment: body.fulfillment,
         paymentMethod: "etransfer",
         payment: null,
+        memberId: orderingMember ? orderingMember.id : null,
         createdAt: new Date().toISOString(),
         status: initialStatuses.includes(body.status) ? body.status : "awaiting_transfer",
       };
@@ -559,6 +932,13 @@ const server = http.createServer(async (req, res) => {
 });
 
 
-server.listen(PORT, HOST, () => {
-  console.log(`Server running at http://${HOST}:${PORT}`);
-});
+initializeMemberDatabase()
+  .then(() => {
+    server.listen(PORT, HOST, () => {
+      console.log(`Server running at http://${HOST}:${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error("Member database initialization failed:", error);
+    process.exit(1);
+  });
