@@ -358,6 +358,7 @@
   <div class="admin-tabs">
     <button class="btn tab-btn active" id="ordersTab" onclick="showView('orders')">Orders</button>
     <button class="btn tab-btn" id="productsTab" onclick="showView('products')">Products</button>
+    <button class="btn tab-btn" id="membersTab" onclick="showView('members')">Members</button>
   </div>
 
 
@@ -467,6 +468,15 @@
   </div>
   </div>
 
+  <div class="admin-view" id="membersView">
+    <div class="panel">
+      <div class="order-toolbar">
+        <h2>Members</h2>
+        <button class="btn btn-primary btn-small" onclick="loadMembers()">Refresh</button>
+      </div>
+      <div id="memberListContainer"><p class="empty-msg">Loading members...</p></div>
+    </div>
+  </div>
 
 </div>
 
@@ -488,6 +498,7 @@
 
   let allProducts = [];
   let allOrders = [];
+  let allMembers = [];
   let editingProductId = null;
   let editingOrderId = null;
   const orderStatuses = [
@@ -505,8 +516,32 @@
   function showView(view) {
     document.getElementById("ordersView").classList.toggle("active", view === "orders");
     document.getElementById("productsView").classList.toggle("active", view === "products");
+    document.getElementById("membersView").classList.toggle("active", view === "members");
     document.getElementById("ordersTab").classList.toggle("active", view === "orders");
     document.getElementById("productsTab").classList.toggle("active", view === "products");
+    document.getElementById("membersTab").classList.toggle("active", view === "members");
+  }
+
+  async function loadMembers() {
+    const container = document.getElementById("memberListContainer");
+    container.innerHTML = '<p class="empty-msg">Loading members...</p>';
+    try {
+      const response = await fetch("/api/admin/members");
+      if (!response.ok) throw new Error("Request failed");
+      allMembers = await response.json();
+      if (!allMembers.length) {
+        container.innerHTML = '<p class="empty-msg">No members yet.</p>';
+        return;
+      }
+      container.innerHTML = '<table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Verified</th><th>Joined</th></tr></thead><tbody>' +
+        allMembers.map((member) => '<tr><td>' + escapeHtml(member.name) + '</td><td>' +
+          escapeHtml(member.email) + '</td><td>' + escapeHtml(member.phone) +
+          '</td><td>' + (member.verified ? "Yes" : "No") + '</td><td>' +
+          new Date(member.created_at).toLocaleString() + '</td></tr>').join("") +
+        '</tbody></table>';
+    } catch (error) {
+      container.innerHTML = '<p class="empty-msg">Could not load members. Check DATABASE_URL.</p>';
+    }
   }
 
 
@@ -1111,6 +1146,7 @@
 
   loadOrders();
   loadProducts();
+  loadMembers();
   resetProductForm();
 </script>
 

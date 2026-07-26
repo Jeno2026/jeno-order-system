@@ -58,7 +58,26 @@
   }
   .cart-wrap {
     position: relative;
+  }
+  .header-actions {
     justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .member-button {
+    border: 1px solid rgba(255,255,255,0.55);
+    border-radius: 999px;
+    padding: 7px 12px;
+    background: transparent;
+    color: white;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .member-button:hover {
+    background: rgba(255,255,255,0.12);
   }
   @media (max-width: 420px) {
     .header-nav {
@@ -649,6 +668,139 @@
     text-align: center;
     color: #ded6c8;
   }
+  .member-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(45,41,36,0.56);
+    padding: 24px;
+    overflow-y: auto;
+  }
+  .member-modal.open {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .member-panel {
+    width: min(560px, 100%);
+    margin: 28px auto;
+    background: #fff;
+    border-radius: 16px;
+    padding: 28px;
+    color: #4a453d;
+    box-shadow: 0 18px 50px rgba(0,0,0,.2);
+    position: relative;
+  }
+  .member-close {
+    position: absolute;
+    right: 18px;
+    top: 14px;
+    border: 0;
+    background: transparent;
+    color: #877d70;
+    font-size: 28px;
+    cursor: pointer;
+  }
+  .member-panel h2 {
+    margin: 0 0 18px;
+  }
+  .member-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .member-tab {
+    flex: 1;
+    border: 1px solid #d8d0c2;
+    background: #f7f3ec;
+    color: #6e6459;
+    border-radius: 7px;
+    padding: 9px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .member-tab.active {
+    background: #877d70;
+    color: white;
+  }
+  .member-view label {
+    display: block;
+    margin: 12px 0 5px;
+    color: #6e6459;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .member-view input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #d8d0c2;
+    border-radius: 7px;
+    font: inherit;
+  }
+  .member-submit, .member-secondary {
+    width: 100%;
+    border: 0;
+    border-radius: 7px;
+    padding: 11px;
+    margin-top: 16px;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .member-submit {
+    background: #877d70;
+    color: white;
+  }
+  .member-secondary {
+    background: #eee8de;
+    color: #4a453d;
+  }
+  .member-link {
+    display: inline-block;
+    border: 0;
+    background: none;
+    padding: 12px 0 0;
+    color: #877d70;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .member-message {
+    display: none;
+    margin-top: 14px;
+    padding: 10px;
+    border-radius: 7px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .member-message.success { display: block; background: #edf4eb; color: #486146; }
+  .member-message.error { display: block; background: #f8e9e6; color: #8b493e; }
+  .member-order {
+    border: 1px solid #e6e0d6;
+    border-radius: 9px;
+    padding: 12px;
+    margin: 10px 0;
+    font-size: 13px;
+  }
+  .member-order-head {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .checkout-member-note {
+    border: 1px solid #d8d0c2;
+    background: #f7f3ec;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    color: #6e6459;
+    font-size: 13px;
+  }
+  @media (max-width: 540px) {
+    .member-button { padding: 6px 8px; }
+    .member-panel { padding: 24px 18px; margin: 8px auto; }
+    .header-actions { gap: 4px; }
+  }
 </style>
 </head>
 <body>
@@ -662,7 +814,9 @@
     <div class="header-logo">
       <img src="/images/jeno-logo.png?v=20260725-3" alt="JÉNO Pâtisserie">
     </div>
-    <div class="cart-wrap">
+    <div class="header-actions">
+      <button class="member-button" id="memberButton" onclick="openMemberModal()">Sign in</button>
+      <div class="cart-wrap">
       <button class="cart-icon" onclick="toggleCart()" aria-label="View cart">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M3 3H5L5.4 5M5.4 5H21L18 13H7M5.4 5L7 13M7 13L4.7 15.3C4 16 4.5 17 5.4 17H18M9 21C9.55 21 10 20.55 10 20C10 19.45 9.55 19 9 19C8.45 19 8 19.45 8 20C8 20.55 8.45 21 9 21ZM19 21C19.55 21 20 20.55 20 20C20 19.45 19.55 19 19 19C18.45 19 18 19.45 18 20C18 20.55 18.45 21 19 21Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -675,7 +829,77 @@
         </div>
         <button class="confirm-payment-btn" onclick="goToPayment()">Confirm Payment</button>
       </div>
+      </div>
     </div>
+  </div>
+</div>
+
+<div class="member-modal" id="memberModal" role="dialog" aria-modal="true" aria-labelledby="memberTitle">
+  <div class="member-panel">
+    <button class="member-close" onclick="closeMemberModal()" aria-label="Close">&times;</button>
+    <h2 id="memberTitle">Your JÉNO account</h2>
+    <div id="memberGuestViews">
+      <div class="member-tabs">
+        <button class="member-tab active" id="loginTab" onclick="showMemberView('login')">Sign in</button>
+        <button class="member-tab" id="registerTab" onclick="showMemberView('register')">Create account</button>
+      </div>
+      <div class="member-view" id="memberLoginView">
+        <label for="memberLoginEmail">Email</label>
+        <input id="memberLoginEmail" type="email" autocomplete="email">
+        <label for="memberLoginPassword">Password</label>
+        <input id="memberLoginPassword" type="password" autocomplete="current-password">
+        <button class="member-submit" onclick="memberLogin()">Sign in</button>
+        <button class="member-link" onclick="showMemberView('forgot')">Forgot password?</button>
+      </div>
+      <div class="member-view hidden" id="memberRegisterView">
+        <label for="memberRegisterName">Full name</label>
+        <input id="memberRegisterName" autocomplete="name">
+        <label for="memberRegisterPhone">Phone</label>
+        <input id="memberRegisterPhone" type="tel" autocomplete="tel">
+        <label for="memberRegisterEmail">Email</label>
+        <input id="memberRegisterEmail" type="email" autocomplete="email">
+        <label for="memberRegisterPassword">Password (at least 8 characters)</label>
+        <input id="memberRegisterPassword" type="password" autocomplete="new-password">
+        <label for="memberRegisterConfirm">Confirm password</label>
+        <input id="memberRegisterConfirm" type="password" autocomplete="new-password">
+        <button class="member-submit" onclick="memberRegister()">Create account</button>
+      </div>
+      <div class="member-view hidden" id="memberForgotView">
+        <p>Enter your email and we will send you a password reset link.</p>
+        <label for="memberForgotEmail">Email</label>
+        <input id="memberForgotEmail" type="email" autocomplete="email">
+        <button class="member-submit" onclick="memberForgotPassword()">Send reset link</button>
+        <button class="member-link" onclick="showMemberView('login')">Back to sign in</button>
+      </div>
+      <div class="member-view hidden" id="memberResetView">
+        <p>Choose a new password for your account.</p>
+        <label for="memberResetPassword">New password</label>
+        <input id="memberResetPassword" type="password" autocomplete="new-password">
+        <label for="memberResetConfirm">Confirm new password</label>
+        <input id="memberResetConfirm" type="password" autocomplete="new-password">
+        <button class="member-submit" onclick="memberResetPassword()">Update password</button>
+      </div>
+    </div>
+    <div class="member-view hidden" id="memberAccountView">
+      <h3>Account information</h3>
+      <label for="memberProfileName">Full name</label>
+      <input id="memberProfileName" autocomplete="name">
+      <label for="memberProfilePhone">Phone</label>
+      <input id="memberProfilePhone" type="tel" autocomplete="tel">
+      <label for="memberProfileEmail">Email</label>
+      <input id="memberProfileEmail" type="email" disabled>
+      <button class="member-submit" onclick="memberSaveProfile()">Save profile</button>
+      <h3>Change password</h3>
+      <label for="memberCurrentPassword">Current password</label>
+      <input id="memberCurrentPassword" type="password" autocomplete="current-password">
+      <label for="memberNewPassword">New password</label>
+      <input id="memberNewPassword" type="password" autocomplete="new-password">
+      <button class="member-secondary" onclick="memberChangePassword()">Change password</button>
+      <h3>Your orders</h3>
+      <div id="memberOrders">Loading orders...</div>
+      <button class="member-secondary" onclick="memberLogout()">Sign out</button>
+    </div>
+    <div class="member-message" id="memberMessage"></div>
   </div>
 </div>
 
@@ -772,6 +996,10 @@
 
   <div class="payment-form" id="customerForm">
     <h2>Customer information</h2>
+    <div class="checkout-member-note" id="checkoutMemberNote">
+      You may continue as a guest, or <button class="member-link" onclick="openMemberModal()">sign in</button>
+      to fill in your details and save this order to your account.
+    </div>
 
     <label for="customerName">Full name <span class="required-mark">*</span></label>
     <input type="text" id="customerName" autocomplete="name" placeholder="Jane Smith">
@@ -857,6 +1085,8 @@
   let selectedRollPack = "single";
   let detailQuantity = 1;
   let currentOrder = null;
+  let currentMember = null;
+  let memberResetToken = "";
   const ETRANSFER_EMAIL = "jeno_2026@gmail.com";
   const cakeSizes = [
     { label: '4"', price: 35 },
@@ -931,6 +1161,232 @@
       };
     }
     return cakeDetails[product.id] || rollDetails[product.id] || tiramisuDetails[product.id];
+  }
+
+  function memberMessage(message, type) {
+    const box = document.getElementById("memberMessage");
+    box.textContent = message || "";
+    box.className = message ? "member-message " + (type || "success") : "member-message";
+  }
+
+  function openMemberModal() {
+    document.getElementById("memberModal").classList.add("open");
+    document.body.style.overflow = "hidden";
+    memberMessage("");
+    if (currentMember) {
+      showMemberAccount();
+    } else if (memberResetToken) {
+      showMemberView("reset");
+    }
+  }
+
+  function closeMemberModal() {
+    document.getElementById("memberModal").classList.remove("open");
+    document.body.style.overflow = "";
+  }
+
+  function showMemberView(view) {
+    const views = ["Login", "Register", "Forgot", "Reset"];
+    for (const name of views) {
+      document.getElementById("member" + name + "View").classList.toggle(
+        "hidden", name.toLowerCase() !== view
+      );
+    }
+    document.getElementById("loginTab").classList.toggle("active", view === "login");
+    document.getElementById("registerTab").classList.toggle("active", view === "register");
+    memberMessage("");
+  }
+
+  async function memberRequest(path, options) {
+    const response = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Something went wrong.");
+    return data;
+  }
+
+  async function checkMemberSession() {
+    try {
+      const data = await memberRequest("/api/members/session");
+      currentMember = data.member;
+      updateMemberUi();
+    } catch (error) {
+      currentMember = null;
+      updateMemberUi();
+    }
+  }
+
+  function updateMemberUi() {
+    document.getElementById("memberButton").textContent =
+      currentMember ? "Hi, " + currentMember.name.split(/\s+/)[0] : "Sign in";
+    const note = document.getElementById("checkoutMemberNote");
+    if (note) {
+      note.innerHTML = currentMember
+        ? "Signed in as <strong>" + escapeHtml(currentMember.email) + "</strong>. This order will appear in your account."
+        : 'You may continue as a guest, or <button class="member-link" onclick="openMemberModal()">sign in</button> to fill in your details and save this order to your account.';
+    }
+    if (currentMember) fillCheckoutFromMember();
+  }
+
+  function fillCheckoutFromMember() {
+    if (!currentMember) return;
+    document.getElementById("customerName").value = currentMember.name || "";
+    document.getElementById("customerPhone").value = currentMember.phone || "";
+    document.getElementById("customerEmail").value = currentMember.email || "";
+  }
+
+  async function memberRegister() {
+    const password = document.getElementById("memberRegisterPassword").value;
+    if (password !== document.getElementById("memberRegisterConfirm").value) {
+      return memberMessage("Passwords do not match.", "error");
+    }
+    try {
+      const data = await memberRequest("/api/members/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: document.getElementById("memberRegisterName").value.trim(),
+          phone: document.getElementById("memberRegisterPhone").value.trim(),
+          email: document.getElementById("memberRegisterEmail").value.trim(),
+          password,
+        }),
+      });
+      showMemberView("login");
+      memberMessage(data.message, "success");
+    } catch (error) {
+      memberMessage(error.message, "error");
+    }
+  }
+
+  async function memberLogin() {
+    try {
+      const data = await memberRequest("/api/members/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: document.getElementById("memberLoginEmail").value.trim(),
+          password: document.getElementById("memberLoginPassword").value,
+        }),
+      });
+      currentMember = data.member;
+      updateMemberUi();
+      await showMemberAccount();
+      memberMessage("Welcome back, " + currentMember.name + ".", "success");
+    } catch (error) {
+      memberMessage(error.message, "error");
+    }
+  }
+
+  async function memberForgotPassword() {
+    try {
+      const data = await memberRequest("/api/members/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({
+          email: document.getElementById("memberForgotEmail").value.trim(),
+        }),
+      });
+      memberMessage(data.message, "success");
+    } catch (error) {
+      memberMessage(error.message, "error");
+    }
+  }
+
+  async function memberResetPassword() {
+    const password = document.getElementById("memberResetPassword").value;
+    if (password !== document.getElementById("memberResetConfirm").value) {
+      return memberMessage("Passwords do not match.", "error");
+    }
+    try {
+      const data = await memberRequest("/api/members/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ token: memberResetToken, password }),
+      });
+      memberResetToken = "";
+      history.replaceState({}, "", location.pathname);
+      showMemberView("login");
+      memberMessage(data.message, "success");
+    } catch (error) {
+      memberMessage(error.message, "error");
+    }
+  }
+
+  async function showMemberAccount() {
+    if (!currentMember) return;
+    document.getElementById("memberGuestViews").classList.add("hidden");
+    document.getElementById("memberAccountView").classList.remove("hidden");
+    document.getElementById("memberProfileName").value = currentMember.name;
+    document.getElementById("memberProfilePhone").value = currentMember.phone;
+    document.getElementById("memberProfileEmail").value = currentMember.email;
+    try {
+      const data = await memberRequest("/api/members/orders");
+      renderMemberOrders(data);
+    } catch (error) {
+      document.getElementById("memberOrders").textContent = error.message;
+    }
+  }
+
+  function renderMemberOrders(orders) {
+    const container = document.getElementById("memberOrders");
+    if (!orders.length) {
+      container.innerHTML = "<p>No orders yet.</p>";
+      return;
+    }
+    container.innerHTML = orders.map((order) => {
+      const items = Object.values(order.items || {}).map((item) =>
+        escapeHtml(item.name) + " × " + Number(item.qty || 0)
+      ).join("<br>");
+      return '<div class="member-order"><div class="member-order-head"><span>' +
+        escapeHtml(order.id) + "</span><span>$" + Number(order.total || 0).toFixed(2) +
+        "</span></div><div>" + items + "</div><div>Status: " +
+        escapeHtml(String(order.status || "").replace(/_/g, " ")) + "</div><div>" +
+        new Date(order.createdAt).toLocaleString() + "</div></div>";
+    }).join("");
+  }
+
+  async function memberSaveProfile() {
+    try {
+      const data = await memberRequest("/api/members/profile", {
+        method: "PUT",
+        body: JSON.stringify({
+          name: document.getElementById("memberProfileName").value.trim(),
+          phone: document.getElementById("memberProfilePhone").value.trim(),
+        }),
+      });
+      currentMember = data.member;
+      updateMemberUi();
+      memberMessage("Profile updated.", "success");
+    } catch (error) {
+      memberMessage(error.message, "error");
+    }
+  }
+
+  async function memberChangePassword() {
+    try {
+      const data = await memberRequest("/api/members/password", {
+        method: "PUT",
+        body: JSON.stringify({
+          currentPassword: document.getElementById("memberCurrentPassword").value,
+          newPassword: document.getElementById("memberNewPassword").value,
+        }),
+      });
+      document.getElementById("memberCurrentPassword").value = "";
+      document.getElementById("memberNewPassword").value = "";
+      memberMessage(data.message, "success");
+    } catch (error) {
+      memberMessage(error.message, "error");
+    }
+  }
+
+  async function memberLogout() {
+    try {
+      await memberRequest("/api/members/logout", { method: "POST", body: "{}" });
+    } catch (error) {}
+    currentMember = null;
+    document.getElementById("memberGuestViews").classList.remove("hidden");
+    document.getElementById("memberAccountView").classList.add("hidden");
+    showMemberView("login");
+    updateMemberUi();
+    closeMemberModal();
   }
 
   // ---------- Load the menu from the backend ----------
@@ -1016,9 +1472,24 @@
     document.getElementById("categoryNav").style.top = headerHeight + "px";
   }
 
-  window.addEventListener("load", function() {
+  window.addEventListener("load", async function() {
     loadMenu();
     positionCategoryNav();
+    await checkMemberSession();
+    const params = new URLSearchParams(location.search);
+    if (params.get("member") === "verified") {
+      openMemberModal();
+      showMemberView("login");
+      memberMessage("Email verified. You can now sign in.", "success");
+    } else if (params.get("member") === "verification-invalid") {
+      openMemberModal();
+      showMemberView("register");
+      memberMessage("This verification link is invalid or expired. Please register again.", "error");
+    } else if (params.get("member") === "reset" && params.get("token")) {
+      memberResetToken = params.get("token");
+      openMemberModal();
+      showMemberView("reset");
+    }
   });
   window.addEventListener("resize", positionCategoryNav);
 
