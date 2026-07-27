@@ -816,11 +816,13 @@
 
     try {
       const res = await fetch("/api/orders");
-      if (!res.ok) throw new Error("Request failed");
-      allOrders = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Server response: " + res.status);
+      allOrders = data;
       renderOrders();
     } catch (err) {
-      container.innerHTML = '<p class="empty-msg">Could not load orders.</p>';
+      container.innerHTML = '<p class="empty-msg">Could not load orders: ' +
+        escapeHtml(err.message) + "</p>";
     }
   }
 
