@@ -1173,11 +1173,22 @@
     for (const category in groups) {
       html += '<div class="category-group">';
       html += "<h3>" + escapeHtml(category) + "</h3>";
-      html += "<table><thead><tr><th>Name</th><th>Status</th><th>Price</th><th></th></tr></thead><tbody>";
+      html += "<table><thead><tr><th>Order</th><th>Name</th><th>Status</th><th>Price</th><th></th></tr></thead><tbody>";
 
 
-      for (const p of groups[category]) {
+      for (let productIndex = 0; productIndex < groups[category].length; productIndex += 1) {
+        const p = groups[category][productIndex];
+        const isFirst = productIndex === 0;
+        const isLast = productIndex === groups[category].length - 1;
         html += "<tr>";
+        html += '<td class="actions">';
+        html += '<button class="btn btn-secondary btn-small" title="Move up" ' +
+          (isFirst ? "disabled " : "") +
+          'onclick="moveProduct(\'' + p.id + '\', -1)">&#8593;</button>';
+        html += '<button class="btn btn-secondary btn-small" title="Move down" ' +
+          (isLast ? "disabled " : "") +
+          'onclick="moveProduct(\'' + p.id + '\', 1)">&#8595;</button>';
+        html += "</td>";
         html += "<td>" + escapeHtml(p.name) + "</td>";
         const productStatus = p.status || "active";
         const statusLabels = { active: "Active", sold_out: "Sold out", hidden: "Hidden" };
@@ -1202,6 +1213,36 @@
 
 
     container.innerHTML = html;
+  }
+
+  async function moveProduct(productId, direction) {
+    const currentIndex = allProducts.findIndex((product) => product.id === productId);
+    if (currentIndex < 0) return;
+    const category = allProducts[currentIndex].category;
+    const categoryIndexes = allProducts
+      .map((product, index) => product.category === category ? index : -1)
+      .filter((index) => index >= 0);
+    const position = categoryIndexes.indexOf(currentIndex);
+    const targetPosition = position + direction;
+    if (targetPosition < 0 || targetPosition >= categoryIndexes.length) return;
+
+    const targetIndex = categoryIndexes[targetPosition];
+    [allProducts[currentIndex], allProducts[targetIndex]] =
+      [allProducts[targetIndex], allProducts[currentIndex]];
+    renderProductList();
+
+    try {
+      const response = await fetch("/api/admin/products/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds: allProducts.map((product) => product.id) }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Could not save product order.");
+    } catch (error) {
+      alert(error.message);
+      await loadProducts();
+    }
   }
 
 
