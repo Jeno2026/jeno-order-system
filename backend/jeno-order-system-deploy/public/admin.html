@@ -420,7 +420,29 @@
 
 
   <div class="admin-view" id="productsView">
-  <div class="panel" id="productFormPanel">
+  <div class="panel" id="productModePanel">
+    <h2>Product Management</h2>
+    <p class="empty-msg" style="text-align:left; padding:0;">Choose what you would like to do.</p>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="button" onclick="beginAddProduct()">Add a new product</button>
+      <button class="btn btn-secondary" type="button" onclick="beginEditProduct()">Edit existing products</button>
+    </div>
+  </div>
+
+  <div class="panel" id="productEditPicker" style="display:none;">
+    <h2>Edit an Existing Product</h2>
+    <div class="form-row full">
+      <div>
+        <label for="existingProductSelect">Choose a product</label>
+        <select id="existingProductSelect" onchange="selectExistingProduct(this.value)">
+          <option value="">Select a product...</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-secondary btn-small" type="button" onclick="returnToProductChoices()">Back</button>
+  </div>
+
+  <div class="panel" id="productFormPanel" style="display:none;">
     <h2 id="productFormTitle">Add a New Product</h2>
     <div class="form-row">
       <div>
@@ -477,13 +499,13 @@
 
     <div class="form-actions">
       <button class="btn btn-primary" id="saveProductButton" onclick="saveProduct()">Add Product</button>
-      <button class="btn btn-secondary" id="cancelEditButton" onclick="resetProductForm()" style="display:none;">Cancel edit</button>
+      <button class="btn btn-secondary" id="cancelEditButton" onclick="returnToProductChoices()">Cancel</button>
     </div>
     <p class="status-msg" id="addStatusMsg"></p>
   </div>
 
 
-  <div class="panel">
+  <div class="panel" id="currentMenuPanel" style="display:none;">
     <h2>Current Menu</h2>
     <div id="productListContainer">
       <p class="empty-msg">Loading products...</p>
@@ -543,6 +565,7 @@
     document.getElementById("ordersTab").classList.toggle("active", view === "orders");
     document.getElementById("productsTab").classList.toggle("active", view === "products");
     document.getElementById("membersTab").classList.toggle("active", view === "members");
+    if (view === "products") returnToProductChoices();
   }
 
   async function loadMembers() {
@@ -862,10 +885,67 @@
       const res = await fetch("/api/products");
       allProducts = await res.json();
       renderProductList();
+      populateExistingProductSelect();
     } catch (err) {
       document.getElementById("productListContainer").innerHTML =
         '<p class="empty-msg">Could not load products. Is the server running?</p>';
     }
+  }
+
+  function populateExistingProductSelect() {
+    const select = document.getElementById("existingProductSelect");
+    if (!select) return;
+    const currentValue = select.value;
+    const sortedProducts = [...allProducts].sort((a, b) =>
+      String(a.category).localeCompare(String(b.category)) ||
+      String(a.name).localeCompare(String(b.name))
+    );
+    select.innerHTML = '<option value="">Select a product...</option>' +
+      sortedProducts.map((product) =>
+        '<option value="' + escapeAttr(product.id) + '">' +
+        escapeHtml(product.category) + " — " + escapeHtml(product.name) +
+        "</option>"
+      ).join("");
+    if (sortedProducts.some((product) => product.id === currentValue)) {
+      select.value = currentValue;
+    }
+  }
+
+  function beginAddProduct() {
+    resetProductForm();
+    document.getElementById("productModePanel").style.display = "none";
+    document.getElementById("productEditPicker").style.display = "none";
+    document.getElementById("currentMenuPanel").style.display = "none";
+    document.getElementById("productFormPanel").style.display = "";
+    document.getElementById("cancelEditButton").style.display = "";
+    document.getElementById("productName").focus();
+  }
+
+  function beginEditProduct() {
+    resetProductForm();
+    document.getElementById("productModePanel").style.display = "none";
+    document.getElementById("productFormPanel").style.display = "none";
+    document.getElementById("productEditPicker").style.display = "";
+    document.getElementById("currentMenuPanel").style.display = "";
+    populateExistingProductSelect();
+  }
+
+  function selectExistingProduct(productId) {
+    if (!productId) {
+      document.getElementById("productFormPanel").style.display = "none";
+      return;
+    }
+    startEdit(productId);
+  }
+
+  function returnToProductChoices() {
+    resetProductForm();
+    document.getElementById("existingProductSelect").value = "";
+    document.getElementById("productFormPanel").style.display = "none";
+    document.getElementById("productEditPicker").style.display = "none";
+    document.getElementById("currentMenuPanel").style.display = "none";
+    document.getElementById("productModePanel").style.display = "";
+    document.getElementById("productModePanel").scrollIntoView({ behavior: "smooth" });
   }
 
 
@@ -1158,8 +1238,8 @@
 
 
       showAddStatus(editingProductId ? "Product updated!" : "Product added!", "success");
-      resetProductForm();
       await loadProducts();
+      returnToProductChoices();
     } catch (err) {
       showAddStatus("Something went wrong. Please try again.", "error");
     }
@@ -1185,6 +1265,11 @@
     document.getElementById("productFormTitle").innerText = "Edit Product";
     document.getElementById("saveProductButton").innerText = "Save Changes";
     document.getElementById("cancelEditButton").style.display = "";
+    document.getElementById("productModePanel").style.display = "none";
+    document.getElementById("productEditPicker").style.display = "";
+    document.getElementById("currentMenuPanel").style.display = "";
+    document.getElementById("productFormPanel").style.display = "";
+    document.getElementById("existingProductSelect").value = id;
     document.getElementById("productCategory").value = product.category;
     document.getElementById("productName").value = product.name;
     document.getElementById("productImage").value = product.image || "";
@@ -1230,7 +1315,8 @@
     try {
       const res = await fetch("/api/products/" + id, { method: "DELETE" });
       if (!res.ok) throw new Error("Request failed");
-      loadProducts();
+      await loadProducts();
+      if (editingProductId === id) beginEditProduct();
     } catch (err) {
       alert("Could not delete product. Please try again.");
     }
