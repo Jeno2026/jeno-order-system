@@ -221,6 +221,24 @@
     font-size: 12px;
     margin: -7px 0 14px;
   }
+  .weekday-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .weekday-options label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 9px 11px;
+    border: 1px solid #d8d0c2;
+    border-radius: 7px;
+    background: #f7f3ec;
+  }
+  .weekday-options input {
+    width: auto;
+  }
   .order-card-actions { margin-top: 12px; }
   .order-editor {
     display: none;
@@ -394,6 +412,7 @@
     <button class="btn tab-btn active" id="ordersTab" onclick="showView('orders')">Orders</button>
     <button class="btn tab-btn" id="productsTab" onclick="showView('products')">Products</button>
     <button class="btn tab-btn" id="membersTab" onclick="showView('members')">Members</button>
+    <button class="btn tab-btn" id="settingsTab" onclick="showView('settings')">Settings</button>
   </div>
 
 
@@ -565,6 +584,52 @@
     </div>
   </div>
 
+  <div class="admin-view" id="settingsView">
+    <div class="panel">
+      <h2>Ordering Settings</h2>
+      <div class="form-row">
+        <div>
+          <label for="minimumLeadDays">Minimum advance notice (days)</label>
+          <input id="minimumLeadDays" type="number" min="0" max="60" value="2">
+        </div>
+        <div>
+          <label for="dailyOrderLimit">Maximum orders per day</label>
+          <input id="dailyOrderLimit" type="number" min="1" max="500" value="10">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div>
+          <label>Closed every week on</label>
+          <div class="weekday-options" id="closedWeekdays">
+            <label><input type="checkbox" value="0"> Sunday</label>
+            <label><input type="checkbox" value="1"> Monday</label>
+            <label><input type="checkbox" value="2"> Tuesday</label>
+            <label><input type="checkbox" value="3"> Wednesday</label>
+            <label><input type="checkbox" value="4"> Thursday</label>
+            <label><input type="checkbox" value="5"> Friday</label>
+            <label><input type="checkbox" value="6"> Saturday</label>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label for="blackoutDates">Special closed dates</label>
+          <textarea id="blackoutDates" placeholder="2026-12-25&#10;2026-12-26"></textarea>
+          <p class="upload-note">Enter one date per line in YYYY-MM-DD format.</p>
+        </div>
+        <div>
+          <label for="pickupTimes">Available pickup / delivery times</label>
+          <textarea id="pickupTimes" placeholder="10:00&#10;12:00&#10;14:00&#10;16:00"></textarea>
+          <p class="upload-note">Enter one 24-hour time per line.</p>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="saveStoreSettings()">Save Settings</button>
+      </div>
+      <p class="status-msg" id="settingsStatus"></p>
+    </div>
+  </div>
+
 </div>
 
 
@@ -604,10 +669,13 @@
     document.getElementById("ordersView").classList.toggle("active", view === "orders");
     document.getElementById("productsView").classList.toggle("active", view === "products");
     document.getElementById("membersView").classList.toggle("active", view === "members");
+    document.getElementById("settingsView").classList.toggle("active", view === "settings");
     document.getElementById("ordersTab").classList.toggle("active", view === "orders");
     document.getElementById("productsTab").classList.toggle("active", view === "products");
     document.getElementById("membersTab").classList.toggle("active", view === "members");
+    document.getElementById("settingsTab").classList.toggle("active", view === "settings");
     if (view === "products") returnToProductChoices();
+    if (view === "settings") loadStoreSettings();
   }
 
   async function loadMembers() {
@@ -688,6 +756,56 @@
     } catch (error) {
       alert(error.message);
     }
+  }
+
+  async function loadStoreSettings() {
+    try {
+      const response = await fetch("/api/store-settings");
+      const settings = await response.json();
+      if (!response.ok) throw new Error(settings.error || "Could not load settings.");
+      document.getElementById("minimumLeadDays").value = settings.minLeadDays;
+      document.getElementById("dailyOrderLimit").value = settings.dailyOrderLimit;
+      document.querySelectorAll("#closedWeekdays input").forEach((checkbox) => {
+        checkbox.checked = settings.closedWeekdays.includes(Number(checkbox.value));
+      });
+      document.getElementById("blackoutDates").value = settings.blackoutDates.join("\n");
+      document.getElementById("pickupTimes").value = settings.pickupTimes.join("\n");
+    } catch (error) {
+      showSettingsStatus(error.message, "error");
+    }
+  }
+
+  async function saveStoreSettings() {
+    const lines = (id) => document.getElementById(id).value
+      .split(/[\n,]+/).map((value) => value.trim()).filter(Boolean);
+    const settings = {
+      minLeadDays: Number(document.getElementById("minimumLeadDays").value),
+      dailyOrderLimit: Number(document.getElementById("dailyOrderLimit").value),
+      closedWeekdays: [...document.querySelectorAll("#closedWeekdays input:checked")]
+        .map((checkbox) => Number(checkbox.value)),
+      blackoutDates: lines("blackoutDates"),
+      pickupTimes: lines("pickupTimes"),
+    };
+    try {
+      const response = await fetch("/api/admin/store-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Could not save settings.");
+      showSettingsStatus("Ordering settings saved.", "success");
+      await loadStoreSettings();
+    } catch (error) {
+      showSettingsStatus(error.message, "error");
+    }
+  }
+
+  function showSettingsStatus(message, type) {
+    const element = document.getElementById("settingsStatus");
+    element.textContent = message;
+    element.className = "status-msg " + type;
+    element.style.display = "block";
   }
 
 

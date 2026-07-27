@@ -1098,13 +1098,14 @@
     <div class="payment-form-row">
       <div>
         <label for="fulfillmentDate">Preferred date <span class="required-mark">*</span></label>
-        <input type="date" id="fulfillmentDate">
+        <input type="date" id="fulfillmentDate" onchange="validateSelectedFulfillmentDate()">
       </div>
       <div>
-        <label for="fulfillmentTime">Preferred time</label>
-        <input type="time" id="fulfillmentTime">
+        <label for="fulfillmentTime">Preferred time <span class="required-mark">*</span></label>
+        <select id="fulfillmentTime"><option value="">Choose a time</option></select>
       </div>
     </div>
+    <p class="form-help" id="fulfillmentAvailabilityMessage"></p>
 
     <label for="orderNotes">Order notes / allergy information</label>
     <textarea id="orderNotes" placeholder="Special requests or allergy information"></textarea>
@@ -1153,6 +1154,7 @@
   // Cart is stored as an object: { itemId: { name, price, qty } }
   let cart = {};
   let allProducts = []; // Cache of products loaded from the server
+  let storeSettings = null;
   let activeProduct = null;
   let activeProductType = null;
   let selectedCakeSize = '4"';
@@ -1463,6 +1465,60 @@
     }
   }
 
+  function localDateAfterDays(days) {
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setDate(date.getDate() + Number(days || 0));
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
+  }
+
+  async function loadOrderingSettings() {
+    try {
+      const response = await fetch("/api/store-settings");
+      if (!response.ok) throw new Error("Could not load ordering settings.");
+      storeSettings = await response.json();
+      const timeSelect = document.getElementById("fulfillmentTime");
+      timeSelect.innerHTML = '<option value="">Choose a time</option>' +
+        storeSettings.pickupTimes.map((time) =>
+          '<option value="' + time + '">' + time + "</option>"
+        ).join("");
+      document.getElementById("fulfillmentDate").min =
+        localDateAfterDays(storeSettings.minLeadDays);
+    } catch (error) {
+      document.getElementById("fulfillmentAvailabilityMessage").textContent =
+        "Ordering availability could not be loaded. Please refresh the page.";
+    }
+  }
+
+  function validateSelectedFulfillmentDate() {
+    const input = document.getElementById("fulfillmentDate");
+    const message = document.getElementById("fulfillmentAvailabilityMessage");
+    if (!input.value || !storeSettings) {
+      message.textContent = "";
+      return true;
+    }
+    let error = "";
+    if (input.value < localDateAfterDays(storeSettings.minLeadDays)) {
+      error = "Please choose a later date. Advance notice is required.";
+    } else {
+      const weekday = new Date(input.value + "T12:00:00").getDay();
+      if (storeSettings.closedWeekdays.includes(weekday)) {
+        error = "We are closed on this day.";
+      } else if (storeSettings.blackoutDates.includes(input.value)) {
+        error = "This date is unavailable.";
+      } else if (storeSettings.fullyBookedDates.includes(input.value)) {
+        error = "This date is fully booked.";
+      }
+    }
+    message.textContent = error;
+    message.style.color = error ? "#a04f47" : "";
+    input.setCustomValidity(error);
+    return !error;
+  }
+
   // Turn a category name like "Cinnamon Rolls" into a URL-safe id like "cinnamon-rolls"
   function slugify(text) {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -1539,7 +1595,7 @@
   }
 
   window.addEventListener("load", async function() {
-    loadMenu();
+    await Promise.all([loadMenu(), loadOrderingSettings()]);
     positionCategoryNav();
     await checkMemberSession();
   });
@@ -1820,7 +1876,7 @@
     document.getElementById("customerForm").classList.remove("hidden");
     document.getElementById("transferConfirmation").classList.add("hidden");
     const dateInput = document.getElementById("fulfillmentDate");
-    dateInput.min = new Date().toISOString().split("T")[0];
+    dateInput.min = localDateAfterDays(storeSettings ? storeSettings.minLeadDays : 0);
     document.getElementById("cartPanel").classList.remove("open");
     window.scrollTo(0, 0);
   }
@@ -1856,6 +1912,14 @@
 
     if (!customer.name || !customer.phone || !customer.email || !fulfillment.date) {
       alert("Please complete your name, phone, email, and preferred date.");
+      return;
+    }
+    if (!fulfillment.time) {
+      alert("Please choose a preferred time.");
+      return;
+    }
+    if (!validateSelectedFulfillmentDate()) {
+      alert(document.getElementById("fulfillmentAvailabilityMessage").textContent);
       return;
     }
     if (!customer.email.includes("@")) {
