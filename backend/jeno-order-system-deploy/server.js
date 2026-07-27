@@ -167,8 +167,93 @@ async function initializeMemberDatabase() {
     );
     CREATE INDEX IF NOT EXISTS member_sessions_member_id_idx
       ON member_sessions(member_id);
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      data JSONB NOT NULL,
+      sort_order BIGSERIAL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS orders (
+      id TEXT PRIMARY KEY,
+      member_id TEXT,
+      customer_email TEXT,
+      data JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS orders_member_id_idx ON orders(member_id);
+    CREATE INDEX IF NOT EXISTS orders_customer_email_idx ON orders(customer_email);
+    CREATE INDEX IF NOT EXISTS orders_created_at_idx ON orders(created_at);
   `);
   await pool.query("DELETE FROM member_sessions WHERE expires_at <= NOW()");
+  await migrateJsonDataToPostgres();
+}
+
+async function migrateJsonDataToPostgres() {
+  const productCount = Number((await pool.query("SELECT COUNT(*) FROM products")).rows[0].count);
+  if (productCount === 0 && fs.existsSync(PRODUCTS_FILE)) {
+    const products = readJsonFile(PRODUCTS_FILE);
+    for (const product of products) {
+      if (!product || !product.id) continue;
+      await pool.query(
+        "INSERT INTO products (id, data) VALUES ($1, $2::jsonb) ON CONFLICT (id) DO NOTHING",
+        [String(product.id), JSON.stringify(product)]
+      );
+    }
+    console.log(`Migrated ${products.length} products from JSON to PostgreSQL.`);
+  }
+
+  const orderCount = Number((await pool.query("SELECT COUNT(*) FROM orders")).rows[0].count);
+  if (orderCount === 0 && fs.existsSync(ORDERS_FILE)) {
+    const orders = readJsonFile(ORDERS_FILE);
+    for (const order of orders) {
+      if (!order || !order.id) continue;
+      await pool.query(
+        `INSERT INTO orders (id, member_id, customer_email, data, created_at, updated_at)
+         VALUES ($1, $2, $3, $4::jsonb, COALESCE($5::timestamptz, NOW()), COALESCE($6::timestamptz, NOW()))
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          String(order.id),
+          order.memberId || null,
+          normalizeEmail(order.customer && order.customer.email) || null,
+          JSON.stringify(order),
+          order.createdAt || null,
+          order.updatedAt || order.createdAt || null,
+        ]
+      );
+    }
+    console.log(`Migrated ${orders.length} orders from JSON to PostgreSQL.`);
+  }
+}
+
+async function getProductsFromDatabase() {
+  const result = await pool.query("SELECT data FROM products ORDER BY sort_order ASC, created_at ASC");
+  return result.rows.map((row) => row.data);
+}
+
+async function getOrdersFromDatabase() {
+  const result = await pool.query("SELECT data FROM orders ORDER BY created_at ASC");
+  return result.rows.map((row) => row.data);
+}
+
+async function saveOrderToDatabase(order) {
+  await pool.query(
+    `INSERT INTO orders (id, member_id, customer_email, data, created_at, updated_at)
+     VALUES ($1, $2, $3, $4::jsonb, COALESCE($5::timestamptz, NOW()), NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       member_id = EXCLUDED.member_id,
+       customer_email = EXCLUDED.customer_email,
+       data = EXCLUDED.data,
+       updated_at = NOW()`,
+    [
+      String(order.id),
+      order.memberId || null,
+      normalizeEmail(order.customer && order.customer.email) || null,
+      JSON.stringify(order),
+      order.createdAt || null,
+    ]
+  );
 }
 
 function memberCookie(token, maxAge) {
@@ -398,11 +483,13 @@ const server = http.createServer(async (req, res) => {
     if (pathname === "/api/members/orders" && req.method === "GET") {
       const member = await requireMember(req, res);
       if (!member) return;
-      const orders = readJsonFile(ORDERS_FILE).filter((order) =>
-        order.memberId === member.id ||
-        normalizeEmail(order.customer && order.customer.email) === member.email
+      const result = await pool.query(
+        `SELECT data FROM orders
+         WHERE member_id = $1 OR customer_email = $2
+         ORDER BY created_at DESC`,
+        [member.id, member.email]
       );
-      return sendJson(res, 200, orders.reverse());
+      return sendJson(res, 200, result.rows.map((row) => row.data));
     }
 
     // --- 管理員登入 ---
@@ -536,7 +623,8 @@ const server = http.createServer(async (req, res) => {
 
     // --- API: 取得所有商品 ---
     if (pathname === "/api/products" && req.method === "GET") {
-      const products = readJsonFile(PRODUCTS_FILE);
+      if (!pool) return sendJson(res, 503, { error: "Database is not configured." });
+      const products = await getProductsFromDatabase();
       return sendJson(res, 200, products);
     }
 
@@ -594,9 +682,6 @@ const server = http.createServer(async (req, res) => {
       }
 
 
-      const products = readJsonFile(PRODUCTS_FILE);
-
-
       const newProduct = {
         id: "item_" + Date.now(), // 用時間戳記產生不會重複的商品編號
         category: body.category,
@@ -609,9 +694,10 @@ const server = http.createServer(async (req, res) => {
         options: Array.isArray(body.options) ? body.options : [],
       };
 
-
-      products.push(newProduct);
-      writeJsonFile(PRODUCTS_FILE, products);
+      await pool.query(
+        "INSERT INTO products (id, data) VALUES ($1, $2::jsonb)",
+        [newProduct.id, JSON.stringify(newProduct)]
+      );
 
 
       return sendJson(res, 201, { message: "Product added", product: newProduct });
@@ -625,18 +711,15 @@ const server = http.createServer(async (req, res) => {
       const body = await readRequestBody(req);
 
 
-      const products = readJsonFile(PRODUCTS_FILE);
-      const index = products.findIndex((p) => p.id === id);
-
-
-      if (index === -1) {
+      const existing = await pool.query("SELECT data FROM products WHERE id = $1", [id]);
+      if (!existing.rowCount) {
         return sendJson(res, 404, { error: "Product not found." });
       }
 
 
       // 只更新有傳進來的欄位,其他欄位維持原值
-      products[index] = {
-        ...products[index],
+      const updatedProduct = {
+        ...existing.rows[0].data,
         ...(body.name !== undefined && { name: body.name }),
         ...(body.category !== undefined && { category: body.category }),
         ...(body.price !== undefined && { price: Number(body.price) }),
@@ -653,11 +736,11 @@ const server = http.createServer(async (req, res) => {
         }),
       };
 
-
-      writeJsonFile(PRODUCTS_FILE, products);
-
-
-      return sendJson(res, 200, { message: "Product updated", product: products[index] });
+      await pool.query(
+        "UPDATE products SET data = $1::jsonb, updated_at = NOW() WHERE id = $2",
+        [JSON.stringify(updatedProduct), id]
+      );
+      return sendJson(res, 200, { message: "Product updated", product: updatedProduct });
     }
 
 
@@ -667,17 +750,10 @@ const server = http.createServer(async (req, res) => {
       const id = pathname.split("/api/products/")[1];
 
 
-      const products = readJsonFile(PRODUCTS_FILE);
-      const filtered = products.filter((p) => p.id !== id);
-
-
-      if (filtered.length === products.length) {
+      const result = await pool.query("DELETE FROM products WHERE id = $1 RETURNING id", [id]);
+      if (!result.rowCount) {
         return sendJson(res, 404, { error: "Product not found." });
       }
-
-
-      writeJsonFile(PRODUCTS_FILE, filtered);
-
 
       return sendJson(res, 200, { message: "Product deleted" });
     }
@@ -704,7 +780,6 @@ const server = http.createServer(async (req, res) => {
       }
 
 
-      const orders = readJsonFile(ORDERS_FILE);
       const initialStatuses = [
         "awaiting_transfer", "transfer_submitted", "payment_confirmed",
         "preparing", "ready", "completed", "cancelled",
@@ -724,11 +799,7 @@ const server = http.createServer(async (req, res) => {
         status: initialStatuses.includes(body.status) ? body.status : "awaiting_transfer",
       };
 
-
-      orders.push(newOrder);
-      writeJsonFile(ORDERS_FILE, orders);
-
-
+      await saveOrderToDatabase(newOrder);
       return sendJson(res, 201, { message: "Order received", order: newOrder });
     }
 
@@ -736,7 +807,7 @@ const server = http.createServer(async (req, res) => {
     // --- API: 取得所有訂單(給店家後台看的) ---
     if (pathname === "/api/orders" && req.method === "GET") {
       if (!requireAdmin(req, res)) return;
-      const orders = readJsonFile(ORDERS_FILE);
+      const orders = await getOrdersFromDatabase();
       return sendJson(res, 200, orders);
     }
 
@@ -754,28 +825,26 @@ const server = http.createServer(async (req, res) => {
           !allowedStatuses.includes(body.status)) {
         return sendJson(res, 400, { error: "Complete order information is required." });
       }
-      const orders = readJsonFile(ORDERS_FILE);
-      const order = orders.find((item) => item.id === id);
-      if (!order) return sendJson(res, 404, { error: "Order not found." });
+      const result = await pool.query("SELECT data FROM orders WHERE id = $1", [id]);
+      if (!result.rowCount) return sendJson(res, 404, { error: "Order not found." });
+      const order = result.rows[0].data;
       order.items = body.items;
       order.total = Number(body.total) || 0;
       order.customer = body.customer;
       order.fulfillment = body.fulfillment;
       order.status = body.status;
       order.updatedAt = new Date().toISOString();
-      writeJsonFile(ORDERS_FILE, orders);
+      await saveOrderToDatabase(order);
       return sendJson(res, 200, { message: "Order updated", order });
     }
 
     if (/^\/api\/orders\/[^/]+$/.test(pathname) && req.method === "DELETE") {
       if (!requireAdmin(req, res)) return;
       const id = decodeURIComponent(pathname.split("/")[3]);
-      const orders = readJsonFile(ORDERS_FILE);
-      const filtered = orders.filter((item) => item.id !== id);
-      if (filtered.length === orders.length) {
+      const result = await pool.query("DELETE FROM orders WHERE id = $1 RETURNING id", [id]);
+      if (!result.rowCount) {
         return sendJson(res, 404, { error: "Order not found." });
       }
-      writeJsonFile(ORDERS_FILE, filtered);
       return sendJson(res, 200, { message: "Order deleted" });
     }
 
@@ -794,13 +863,11 @@ const server = http.createServer(async (req, res) => {
       }
 
 
-      const orders = readJsonFile(ORDERS_FILE);
-      const order = orders.find((item) => item.id === id);
-
-
-      if (!order) {
+      const result = await pool.query("SELECT data FROM orders WHERE id = $1", [id]);
+      if (!result.rowCount) {
         return sendJson(res, 404, { error: "Order not found." });
       }
+      const order = result.rows[0].data;
 
 
       order.payment = {
@@ -812,7 +879,7 @@ const server = http.createServer(async (req, res) => {
         submittedAt: new Date().toISOString(),
       };
       order.status = "transfer_submitted";
-      writeJsonFile(ORDERS_FILE, orders);
+      await saveOrderToDatabase(order);
       return sendJson(res, 200, { message: "Transfer information submitted", order });
     }
 
@@ -838,17 +905,16 @@ const server = http.createServer(async (req, res) => {
       }
 
 
-      const orders = readJsonFile(ORDERS_FILE);
-      const order = orders.find((item) => item.id === id);
-
-
-      if (!order) {
+      const result = await pool.query("SELECT data FROM orders WHERE id = $1", [id]);
+      if (!result.rowCount) {
         return sendJson(res, 404, { error: "Order not found." });
       }
+      const order = result.rows[0].data;
 
 
       order.status = body.status;
-      writeJsonFile(ORDERS_FILE, orders);
+      order.updatedAt = new Date().toISOString();
+      await saveOrderToDatabase(order);
       return sendJson(res, 200, { message: "Order updated", order });
     }
 
