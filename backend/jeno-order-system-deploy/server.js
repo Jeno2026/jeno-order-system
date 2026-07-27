@@ -691,7 +691,13 @@ const server = http.createServer(async (req, res) => {
         description: body.description || "",
         image: body.image || "",
         optionType: body.optionType || "quantity",
-        options: Array.isArray(body.options) ? body.options : [],
+        status: ["active", "sold_out", "hidden"].includes(body.status) ? body.status : "active",
+        options: Array.isArray(body.options) ? body.options.map((option) => ({
+          value: String(option.value),
+          label: String(option.label),
+          price: Number(option.price),
+          available: option.available !== false,
+        })) : [],
       };
 
       await pool.query(
@@ -727,11 +733,13 @@ const server = http.createServer(async (req, res) => {
         ...(body.description !== undefined && { description: String(body.description) }),
         ...(body.image !== undefined && { image: String(body.image) }),
         ...(body.optionType !== undefined && { optionType: String(body.optionType) }),
+        ...(["active", "sold_out", "hidden"].includes(body.status) && { status: body.status }),
         ...(Array.isArray(body.options) && {
           options: body.options.map((option) => ({
             value: String(option.value),
             label: String(option.label),
             price: Number(option.price),
+            available: option.available !== false,
           })),
         }),
       };
@@ -768,6 +776,22 @@ const server = http.createServer(async (req, res) => {
       // 基本驗證:確認有帶商品清單,而且不是空的
       if (!body.items || Object.keys(body.items).length === 0) {
         return sendJson(res, 400, { error: "Order must contain at least one item." });
+      }
+      const currentProducts = await getProductsFromDatabase();
+      for (const item of Object.values(body.items)) {
+        if (!item.productId) {
+          return sendJson(res, 400, { error: "Please refresh the menu before placing the order." });
+        }
+        const product = currentProducts.find((entry) => entry.id === item.productId);
+        if (!product || product.status === "hidden" || product.status === "sold_out") {
+          return sendJson(res, 409, { error: `${item.name || "A product"} is no longer available.` });
+        }
+        if (item.optionValue && Array.isArray(product.options)) {
+          const option = product.options.find((entry) => entry.value === item.optionValue);
+          if (!option || option.available === false) {
+            return sendJson(res, 409, { error: `${item.name || "An option"} is sold out.` });
+          }
+        }
       }
       if (!body.customer || !body.customer.name || !body.customer.phone || !body.customer.email) {
         return sendJson(res, 400, { error: "Customer name, phone, and email are required." });
