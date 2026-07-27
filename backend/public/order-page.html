@@ -58,7 +58,26 @@
   }
   .cart-wrap {
     position: relative;
+  }
+  .header-actions {
     justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .member-button {
+    border: 1px solid rgba(255,255,255,0.55);
+    border-radius: 999px;
+    padding: 7px 12px;
+    background: transparent;
+    color: white;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .member-button:hover {
+    background: rgba(255,255,255,0.12);
   }
   @media (max-width: 420px) {
     .header-nav {
@@ -416,6 +435,19 @@
   .card.added .card-body {
     background: #eef3ed;
   }
+  .card.sold-out {
+    cursor: not-allowed;
+    opacity: 0.68;
+  }
+  .card.sold-out:hover {
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .sold-out-label {
+    color: #a04f47;
+    font-size: 12px;
+    font-weight: 700;
+    margin: 5px 0 0;
+  }
   .product-detail {
     display: none;
     position: fixed;
@@ -521,6 +553,11 @@
     background: #877d70;
     border-color: #877d70;
   }
+  .size-option:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    text-decoration: line-through;
+  }
   .detail-add-btn {
     margin-top: auto;
     width: 100%;
@@ -535,6 +572,10 @@
   }
   .detail-add-btn:hover {
     background: #6e6459;
+  }
+  .detail-add-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
   }
   .quantity-row {
     display: none;
@@ -649,6 +690,184 @@
     text-align: center;
     color: #ded6c8;
   }
+  .member-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(45,41,36,0.56);
+    padding: 24px;
+    overflow-y: auto;
+  }
+  .member-modal.open {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .member-panel {
+    width: min(560px, 100%);
+    margin: 28px auto;
+    background: #fff;
+    border-radius: 16px;
+    padding: 28px;
+    color: #4a453d;
+    box-shadow: 0 18px 50px rgba(0,0,0,.2);
+    position: relative;
+  }
+  .member-close {
+    position: absolute;
+    right: 18px;
+    top: 14px;
+    border: 0;
+    background: transparent;
+    color: #877d70;
+    font-size: 28px;
+    cursor: pointer;
+  }
+  .member-panel h2 {
+    margin: 0 0 18px;
+  }
+  .member-panel-logo {
+    display: block;
+    width: 190px;
+    max-width: 55%;
+    height: auto;
+    margin: 0 auto 24px;
+  }
+  .member-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .member-tab {
+    flex: 1;
+    border: 1px solid #d8d0c2;
+    background: #f7f3ec;
+    color: #6e6459;
+    border-radius: 7px;
+    padding: 9px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .member-tab.active {
+    background: #877d70;
+    color: white;
+  }
+  .member-view label {
+    display: block;
+    margin: 12px 0 5px;
+    color: #6e6459;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .member-view input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #d8d0c2;
+    border-radius: 7px;
+    font: inherit;
+  }
+  .member-submit, .member-secondary {
+    width: 100%;
+    border: 0;
+    border-radius: 7px;
+    padding: 11px;
+    margin-top: 16px;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .member-submit {
+    background: #877d70;
+    color: white;
+  }
+  .member-secondary {
+    background: #eee8de;
+    color: #4a453d;
+  }
+  .member-link {
+    display: inline-block;
+    border: 0;
+    background: none;
+    padding: 12px 0 0;
+    color: #877d70;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .member-message {
+    display: none;
+    margin-top: 14px;
+    padding: 10px;
+    border-radius: 7px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .member-message.success { display: block; background: #edf4eb; color: #486146; }
+  .member-message.error { display: block; background: #f8e9e6; color: #8b493e; }
+  .member-order {
+    border: 1px solid #e6e0d6;
+    border-radius: 9px;
+    padding: 12px;
+    margin: 10px 0;
+    font-size: 13px;
+  }
+  .member-order-head {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .member-account-tabs {
+    display: flex;
+    gap: 7px;
+    margin-bottom: 20px;
+  }
+  .member-account-tab {
+    flex: 1;
+    border: 1px solid #d8d0c2;
+    border-radius: 7px;
+    background: #f7f3ec;
+    color: #6e6459;
+    padding: 9px 5px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .member-account-tab.active {
+    background: #877d70;
+    color: white;
+  }
+  .site-toast {
+    display: none;
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 150;
+    width: min(420px, calc(100% - 32px));
+    padding: 13px 18px;
+    border-radius: 9px;
+    background: #486146;
+    color: white;
+    text-align: center;
+    font-size: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  }
+  .site-toast.show {
+    display: block;
+  }
+  .checkout-member-note {
+    border: 1px solid #d8d0c2;
+    background: #f7f3ec;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    color: #6e6459;
+    font-size: 13px;
+  }
+  @media (max-width: 540px) {
+    .member-button { padding: 6px 8px; }
+    .member-panel { padding: 24px 18px; margin: 8px auto; }
+    .header-actions { gap: 4px; }
+  }
 </style>
 </head>
 <body>
@@ -662,7 +881,9 @@
     <div class="header-logo">
       <img src="/images/jeno-logo.png?v=20260725-3" alt="JÉNO Pâtisserie">
     </div>
-    <div class="cart-wrap">
+    <div class="header-actions">
+      <button class="member-button" id="memberButton" onclick="openMemberModal()">Sign in</button>
+      <div class="cart-wrap">
       <button class="cart-icon" onclick="toggleCart()" aria-label="View cart">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M3 3H5L5.4 5M5.4 5H21L18 13H7M5.4 5L7 13M7 13L4.7 15.3C4 16 4.5 17 5.4 17H18M9 21C9.55 21 10 20.55 10 20C10 19.45 9.55 19 9 19C8.45 19 8 19.45 8 20C8 20.55 8.45 21 9 21ZM19 21C19.55 21 20 20.55 20 20C20 19.45 19.55 19 19 19C18.45 19 18 19.45 18 20C18 20.55 18.45 21 19 21Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -675,9 +896,86 @@
         </div>
         <button class="confirm-payment-btn" onclick="goToPayment()">Confirm Payment</button>
       </div>
+      </div>
     </div>
   </div>
 </div>
+
+<div class="member-modal" id="memberModal" role="dialog" aria-modal="true" aria-label="JÉNO member account">
+  <div class="member-panel">
+    <button class="member-close" onclick="closeMemberModal()" aria-label="Close">&times;</button>
+    <img class="member-panel-logo"
+      src="/images/jeno-logo-dark.png?v=20260726-member"
+      alt="JÉNO Pâtisserie">
+    <div id="memberGuestViews">
+      <div class="member-tabs">
+        <button class="member-tab active" id="loginTab" onclick="showMemberView('login')">Sign in</button>
+        <button class="member-tab" id="registerTab" onclick="showMemberView('register')">Create account</button>
+      </div>
+      <div class="member-view" id="memberLoginView">
+        <label for="memberLoginEmail">Email</label>
+        <input id="memberLoginEmail" type="email" autocomplete="email">
+        <label for="memberLoginPassword">Password</label>
+        <input id="memberLoginPassword" type="password" autocomplete="current-password">
+        <button class="member-submit" onclick="memberLogin()">Sign in</button>
+        <button class="member-link" onclick="showMemberView('forgot')">Forgot password?</button>
+      </div>
+      <div class="member-view hidden" id="memberRegisterView">
+        <label for="memberRegisterName">Full name</label>
+        <input id="memberRegisterName" autocomplete="name">
+        <label for="memberRegisterPhone">Phone</label>
+        <input id="memberRegisterPhone" type="tel" autocomplete="tel">
+        <label for="memberRegisterEmail">Email</label>
+        <input id="memberRegisterEmail" type="email" autocomplete="email">
+        <label for="memberRegisterPassword">Password (at least 8 characters)</label>
+        <input id="memberRegisterPassword" type="password" autocomplete="new-password">
+        <label for="memberRegisterConfirm">Confirm password</label>
+        <input id="memberRegisterConfirm" type="password" autocomplete="new-password">
+        <button class="member-submit" onclick="memberRegister()">Create account</button>
+      </div>
+      <div class="member-view hidden" id="memberForgotView">
+        <h3>Forgot your password?</h3>
+        <p>Please contact JÉNO and provide the email address used for your account. The store will set a temporary password for you.</p>
+        <button class="member-link" onclick="showMemberView('login')">Back to sign in</button>
+      </div>
+    </div>
+    <div class="member-view hidden" id="memberAccountView">
+      <div class="member-account-tabs">
+        <button class="member-account-tab active" id="memberProfileTab"
+          onclick="showAccountSection('profile')">Profile</button>
+        <button class="member-account-tab" id="memberOrdersTab"
+          onclick="showAccountSection('orders')">Orders</button>
+        <button class="member-account-tab" id="memberPasswordTab"
+          onclick="showAccountSection('password')">Password</button>
+      </div>
+      <div id="memberProfileSection">
+        <h3>Account information</h3>
+        <label for="memberProfileName">Full name</label>
+        <input id="memberProfileName" autocomplete="name">
+        <label for="memberProfilePhone">Phone</label>
+        <input id="memberProfilePhone" type="tel" autocomplete="tel">
+        <label for="memberProfileEmail">Email</label>
+        <input id="memberProfileEmail" type="email" disabled>
+        <button class="member-submit" onclick="memberSaveProfile()">Save profile</button>
+      </div>
+      <div class="hidden" id="memberOrdersSection">
+        <h3>Your orders</h3>
+        <div id="memberOrders">Loading orders...</div>
+      </div>
+      <div class="hidden" id="memberPasswordSection">
+        <h3>Change password</h3>
+        <label for="memberCurrentPassword">Current password</label>
+        <input id="memberCurrentPassword" type="password" autocomplete="current-password">
+        <label for="memberNewPassword">New password</label>
+        <input id="memberNewPassword" type="password" autocomplete="new-password">
+        <button class="member-submit" onclick="memberChangePassword()">Change password</button>
+      </div>
+      <button class="member-secondary" onclick="memberLogout()">Sign out</button>
+    </div>
+    <div class="member-message" id="memberMessage"></div>
+  </div>
+</div>
+<div class="site-toast" id="siteToast" role="status" aria-live="polite"></div>
 
 <div id="mainView">
 
@@ -772,6 +1070,10 @@
 
   <div class="payment-form" id="customerForm">
     <h2>Customer information</h2>
+    <div class="checkout-member-note" id="checkoutMemberNote">
+      You may continue as a guest, or <button class="member-link" onclick="openMemberModal()">sign in</button>
+      to fill in your details and save this order to your account.
+    </div>
 
     <label for="customerName">Full name <span class="required-mark">*</span></label>
     <input type="text" id="customerName" autocomplete="name" placeholder="Jane Smith">
@@ -857,7 +1159,8 @@
   let selectedRollPack = "single";
   let detailQuantity = 1;
   let currentOrder = null;
-  const ETRANSFER_EMAIL = "YOUR-EMAIL@example.com";
+  let currentMember = null;
+  const ETRANSFER_EMAIL = "jeno_2026@gmail.com";
   const cakeSizes = [
     { label: '4"', price: 35 },
     { label: '6"', price: 50 },
@@ -933,6 +1236,220 @@
     return cakeDetails[product.id] || rollDetails[product.id] || tiramisuDetails[product.id];
   }
 
+  function memberMessage(message, type) {
+    const box = document.getElementById("memberMessage");
+    box.textContent = message || "";
+    box.className = message ? "member-message " + (type || "success") : "member-message";
+  }
+
+  function showSiteToast(message) {
+    const toast = document.getElementById("siteToast");
+    toast.textContent = message;
+    toast.classList.add("show");
+    clearTimeout(showSiteToast.timer);
+    showSiteToast.timer = setTimeout(() => toast.classList.remove("show"), 3500);
+  }
+
+  function openMemberModal() {
+    document.getElementById("memberModal").classList.add("open");
+    document.body.style.overflow = "hidden";
+    memberMessage("");
+    if (currentMember) {
+      showMemberAccount();
+    }
+  }
+
+  function closeMemberModal() {
+    document.getElementById("memberModal").classList.remove("open");
+    document.body.style.overflow = "";
+  }
+
+  function showMemberView(view) {
+    const views = ["Login", "Register", "Forgot"];
+    for (const name of views) {
+      document.getElementById("member" + name + "View").classList.toggle(
+        "hidden", name.toLowerCase() !== view
+      );
+    }
+    document.getElementById("loginTab").classList.toggle("active", view === "login");
+    document.getElementById("registerTab").classList.toggle("active", view === "register");
+    memberMessage("");
+  }
+
+  async function memberRequest(path, options) {
+    const response = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Something went wrong.");
+    return data;
+  }
+
+  async function checkMemberSession() {
+    try {
+      const data = await memberRequest("/api/members/session");
+      currentMember = data.member;
+      updateMemberUi();
+    } catch (error) {
+      currentMember = null;
+      updateMemberUi();
+    }
+  }
+
+  function updateMemberUi() {
+    document.getElementById("memberButton").textContent =
+      currentMember ? "Hi, " + currentMember.name.split(/\s+/)[0] : "Sign in";
+    const note = document.getElementById("checkoutMemberNote");
+    if (note) {
+      note.innerHTML = currentMember
+        ? "Signed in as <strong>" + escapeHtml(currentMember.email) + "</strong>. This order will appear in your account."
+        : 'You may continue as a guest, or <button class="member-link" onclick="openMemberModal()">sign in</button> to fill in your details and save this order to your account.';
+    }
+    if (currentMember) fillCheckoutFromMember();
+  }
+
+  function fillCheckoutFromMember() {
+    if (!currentMember) return;
+    document.getElementById("customerName").value = currentMember.name || "";
+    document.getElementById("customerPhone").value = currentMember.phone || "";
+    document.getElementById("customerEmail").value = currentMember.email || "";
+  }
+
+  async function memberRegister() {
+    const password = document.getElementById("memberRegisterPassword").value;
+    if (password !== document.getElementById("memberRegisterConfirm").value) {
+      return memberMessage("Passwords do not match.", "error");
+    }
+    try {
+      const data = await memberRequest("/api/members/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: document.getElementById("memberRegisterName").value.trim(),
+          phone: document.getElementById("memberRegisterPhone").value.trim(),
+          email: document.getElementById("memberRegisterEmail").value.trim(),
+          password,
+        }),
+      });
+      currentMember = data.member;
+      updateMemberUi();
+      closeMemberModal();
+      showSiteToast(data.message);
+    } catch (error) {
+      memberMessage(error.message, "error");
+    }
+  }
+
+  async function memberLogin() {
+    try {
+      const data = await memberRequest("/api/members/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: document.getElementById("memberLoginEmail").value.trim(),
+          password: document.getElementById("memberLoginPassword").value,
+        }),
+      });
+      currentMember = data.member;
+      updateMemberUi();
+      closeMemberModal();
+      showSiteToast("Welcome back, " + currentMember.name + ".");
+    } catch (error) {
+      memberMessage(error.message, "error");
+    }
+  }
+
+  async function showMemberAccount() {
+    if (!currentMember) return;
+    document.getElementById("memberGuestViews").classList.add("hidden");
+    document.getElementById("memberAccountView").classList.remove("hidden");
+    document.getElementById("memberProfileName").value = currentMember.name;
+    document.getElementById("memberProfilePhone").value = currentMember.phone;
+    document.getElementById("memberProfileEmail").value = currentMember.email;
+    showAccountSection("profile");
+    try {
+      const data = await memberRequest("/api/members/orders");
+      renderMemberOrders(data);
+    } catch (error) {
+      document.getElementById("memberOrders").textContent = error.message;
+    }
+  }
+
+  function showAccountSection(section) {
+    for (const name of ["profile", "orders", "password"]) {
+      document.getElementById(
+        "member" + name.charAt(0).toUpperCase() + name.slice(1) + "Section"
+      ).classList.toggle("hidden", name !== section);
+      document.getElementById(
+        "member" + name.charAt(0).toUpperCase() + name.slice(1) + "Tab"
+      ).classList.toggle("active", name === section);
+    }
+    memberMessage("");
+  }
+
+  function renderMemberOrders(orders) {
+    const container = document.getElementById("memberOrders");
+    if (!orders.length) {
+      container.innerHTML = "<p>No orders yet.</p>";
+      return;
+    }
+    container.innerHTML = orders.map((order) => {
+      const items = Object.values(order.items || {}).map((item) =>
+        escapeHtml(item.name) + " × " + Number(item.qty || 0)
+      ).join("<br>");
+      return '<div class="member-order"><div class="member-order-head"><span>' +
+        escapeHtml(order.id) + "</span><span>$" + Number(order.total || 0).toFixed(2) +
+        "</span></div><div>" + items + "</div><div>Status: " +
+        escapeHtml(String(order.status || "").replace(/_/g, " ")) + "</div><div>" +
+        new Date(order.createdAt).toLocaleString() + "</div></div>";
+    }).join("");
+  }
+
+  async function memberSaveProfile() {
+    try {
+      const data = await memberRequest("/api/members/profile", {
+        method: "PUT",
+        body: JSON.stringify({
+          name: document.getElementById("memberProfileName").value.trim(),
+          phone: document.getElementById("memberProfilePhone").value.trim(),
+        }),
+      });
+      currentMember = data.member;
+      updateMemberUi();
+      memberMessage("Profile updated.", "success");
+    } catch (error) {
+      memberMessage(error.message, "error");
+    }
+  }
+
+  async function memberChangePassword() {
+    try {
+      const data = await memberRequest("/api/members/password", {
+        method: "PUT",
+        body: JSON.stringify({
+          currentPassword: document.getElementById("memberCurrentPassword").value,
+          newPassword: document.getElementById("memberNewPassword").value,
+        }),
+      });
+      document.getElementById("memberCurrentPassword").value = "";
+      document.getElementById("memberNewPassword").value = "";
+      memberMessage(data.message, "success");
+    } catch (error) {
+      memberMessage(error.message, "error");
+    }
+  }
+
+  async function memberLogout() {
+    try {
+      await memberRequest("/api/members/logout", { method: "POST", body: "{}" });
+    } catch (error) {}
+    currentMember = null;
+    document.getElementById("memberGuestViews").classList.remove("hidden");
+    document.getElementById("memberAccountView").classList.add("hidden");
+    showMemberView("login");
+    updateMemberUi();
+    closeMemberModal();
+  }
+
   // ---------- Load the menu from the backend ----------
   async function loadMenu() {
     try {
@@ -959,7 +1476,9 @@
 
   // ---------- Render the sticky category navigation links ----------
   function renderCategoryNav() {
-    const categories = [...new Set(allProducts.map((p) => p.category))];
+    const categories = [...new Set(
+      allProducts.filter((p) => p.status !== "hidden").map((p) => p.category)
+    )];
     let html = "";
     for (const category of categories) {
       html += '<a href="#' + slugify(category) + '">' + escapeHtml(category) + "</a>";
@@ -970,7 +1489,7 @@
   // ---------- Render the menu, grouped by category, as product cards ----------
   function renderMenu() {
     const groups = {};
-    for (const p of allProducts) {
+    for (const p of allProducts.filter((product) => product.status !== "hidden")) {
       if (!groups[p.category]) groups[p.category] = [];
       groups[p.category].push(p);
     }
@@ -985,11 +1504,13 @@
         const cardId = "card_" + p.id;
         const detail = getProductDetail(p);
         const hasDetail = Boolean(detail);
-        const action = hasDetail
+        const soldOut = p.status === "sold_out";
+        const action = soldOut ? "" : hasDetail
           ? "openProductDetail('" + p.id + "')"
           : "addToCart('" + p.id + "', '" +
             escapeHtml(p.name).replace(/'/g, "\\'") + "', " + p.price + ", '" + cardId + "')";
-        html += '<div class="card" id="' + cardId + '" onclick="' + action + '">';
+        html += '<div class="card' + (soldOut ? " sold-out" : "") + '" id="' + cardId + '"' +
+          (action ? ' onclick="' + action + '"' : "") + '>';
         html += '<div class="card-img">' +
           (hasDetail
             ? detail.image
@@ -1002,6 +1523,7 @@
           (p.optionType === "size" || cakeDetails[p.id] ? "From $" +
             Number((p.options && p.options[0] ? p.options[0].price : 35)).toFixed(2)
             : "$" + Number(p.price).toFixed(2)) + "</p>";
+        if (soldOut) html += '<p class="sold-out-label">Sold out</p>';
         html += "</div></div>";
       }
 
@@ -1016,16 +1538,17 @@
     document.getElementById("categoryNav").style.top = headerHeight + "px";
   }
 
-  window.addEventListener("load", function() {
+  window.addEventListener("load", async function() {
     loadMenu();
     positionCategoryNav();
+    await checkMemberSession();
   });
   window.addEventListener("resize", positionCategoryNav);
 
   function openProductDetail(productId) {
     const product = allProducts.find((item) => item.id === productId);
     const detail = getProductDetail(product);
-    if (!product || !detail) return;
+    if (!product || !detail || (product.status || "active") !== "active") return;
 
     activeProduct = product;
     activeProductType = product.optionType === "size"
@@ -1034,11 +1557,14 @@
       : product.optionType === "quantity" ? "tiramisu"
       : cakeDetails[productId] ? "cake"
       : rollDetails[productId] ? "roll" : "tiramisu";
-    selectedCakeSize = product.options && product.options[0]
-      ? product.options[0].label
+    const firstAvailableOption = Array.isArray(product.options)
+      ? product.options.find((option) => option.available !== false)
+      : null;
+    selectedCakeSize = firstAvailableOption
+      ? firstAvailableOption.label
       : '4"';
-    selectedRollPack = product.options && product.options[0]
-      ? product.options[0].value
+    selectedRollPack = firstAvailableOption
+      ? firstAvailableOption.value
       : "single";
     detailQuantity = 1;
     document.getElementById("detailTitle").innerText = product.name;
@@ -1083,10 +1609,15 @@
         : cakeSizes;
       document.getElementById("sizeOptions").innerHTML = sizeOptions.map((size, index) =>
         '<button class="size-option' + (size.label === selectedCakeSize ? " selected" : "") +
-        '" onclick="selectCakeSize(' + index + ')">' +
-        size.label + "<br>$" + size.price.toFixed(2) + "</button>"
+        '" onclick="selectCakeSize(' + index + ')"' +
+        (size.available === false ? " disabled" : "") + ">" +
+        size.label + "<br>$" + size.price.toFixed(2) +
+        (size.available === false ? "<br>Sold out" : "") + "</button>"
       ).join("");
-      selectedPrice = sizeOptions.find((size) => size.label === selectedCakeSize).price;
+      const selected = sizeOptions.find((size) =>
+        size.label === selectedCakeSize && size.available !== false
+      );
+      selectedPrice = selected ? Number(selected.price) : 0;
     } else if (activeProductType === "roll") {
       const singlePrice = Number(activeProduct.price);
       const rollPacks = activeProduct.options && activeProduct.options.length
@@ -1102,10 +1633,15 @@
       document.getElementById("detailQuantity").innerText = detailQuantity;
       document.getElementById("sizeOptions").innerHTML = rollPacks.map((pack, index) =>
         '<button class="size-option' + (pack.value === selectedRollPack ? " selected" : "") +
-        '" onclick="selectRollPack(' + index + ')">' +
-        pack.label + "<br>$" + pack.price.toFixed(2) + "</button>"
+        '" onclick="selectRollPack(' + index + ')"' +
+        (pack.available === false ? " disabled" : "") + ">" +
+        pack.label + "<br>$" + pack.price.toFixed(2) +
+        (pack.available === false ? "<br>Sold out" : "") + "</button>"
       ).join("");
-      selectedPrice = rollPacks.find((pack) => pack.value === selectedRollPack).price;
+      const selected = rollPacks.find((pack) =>
+        pack.value === selectedRollPack && pack.available !== false
+      );
+      selectedPrice = selected ? Number(selected.price) : 0;
     } else {
       optionLabel.style.display = "none";
       document.getElementById("sizeOptions").style.display = "none";
@@ -1115,14 +1651,18 @@
       selectedPrice = Number(activeProduct.price);
     }
 
-    document.getElementById("detailAddButton").innerText =
-      "Add to cart — $" + (selectedPrice * detailQuantity).toFixed(2);
+    const addButton = document.getElementById("detailAddButton");
+    addButton.disabled = selectedPrice <= 0;
+    addButton.innerText = selectedPrice > 0
+      ? "Add to cart — $" + (selectedPrice * detailQuantity).toFixed(2)
+      : "Sold out";
   }
 
   function selectCakeSize(sizeIndex) {
     const sizeOptions = activeProduct.options && activeProduct.options.length
       ? activeProduct.options
       : cakeSizes;
+    if (sizeOptions[sizeIndex].available === false) return;
     selectedCakeSize = sizeOptions[sizeIndex].label;
     renderProductOptions();
   }
@@ -1131,6 +1671,7 @@
     const rollPacks = activeProduct.options && activeProduct.options.length
       ? activeProduct.options
       : [{ value: "single" }, { value: "dozen" }];
+    if (rollPacks[packIndex].available === false) return;
     selectedRollPack = rollPacks[packIndex].value;
     renderProductOptions();
   }
@@ -1142,6 +1683,7 @@
 
   function addConfiguredProduct() {
     if (!activeProduct) return;
+    if ((activeProduct.status || "active") !== "active") return;
 
     let optionName;
     let price;
@@ -1150,6 +1692,7 @@
         ? activeProduct.options
         : cakeSizes;
       const selected = sizeOptions.find((size) => size.label === selectedCakeSize);
+      if (!selected || selected.available === false) return;
       optionName = selectedCakeSize;
       price = selected.price;
     } else if (activeProductType === "roll") {
@@ -1160,6 +1703,7 @@
           { value: "dozen", label: "Dozen (12)", price: Number(activeProduct.price) * 12 },
         ];
       const selected = rollPacks.find((pack) => pack.value === selectedRollPack);
+      if (!selected || selected.available === false) return;
       optionName = selected.label;
       price = Number(selected.price);
     } else {
@@ -1175,6 +1719,10 @@
         name: activeProduct.name + " — " + optionName,
         price: price,
         qty: detailQuantity,
+        productId: activeProduct.id,
+        optionValue: activeProductType === "cake"
+          ? (activeProduct.options || []).find((option) => option.label === selectedCakeSize)?.value
+          : activeProductType === "roll" ? selectedRollPack : null,
       };
     }
     updateCartBadge();
@@ -1193,10 +1741,12 @@
 
   // ---------- Cart interactions ----------
   function addToCart(id, name, price, cardId) {
+    const product = allProducts.find((item) => item.id === id);
+    if (!product || (product.status || "active") !== "active") return;
     if (cart[id]) {
       cart[id].qty += 1;
     } else {
-      cart[id] = { name: name, price: price, qty: 1 };
+      cart[id] = { name: name, price: price, qty: 1, productId: id, optionValue: null };
     }
 
     updateCartBadge();
@@ -1339,9 +1889,8 @@
         }),
       });
 
-      if (!res.ok) throw new Error("Order failed");
-
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Order failed");
       currentOrder = data.order;
       document.getElementById("transferOrderId").textContent = currentOrder.id;
       document.getElementById("transferAmount").textContent = "$" + Number(total).toFixed(2);
@@ -1358,7 +1907,7 @@
       renderCartPanel();
       window.scrollTo(0, 0);
     } catch (err) {
-      alert("Something went wrong creating your order. Please try again.");
+      alert(err.message || "Something went wrong creating your order. Please try again.");
     } finally {
       button.disabled = false;
       button.textContent = "Place Order";
