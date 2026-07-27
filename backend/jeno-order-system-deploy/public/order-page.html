@@ -43,18 +43,32 @@
   }
   .header-nav {
     display: flex;
-    gap: 16px;
+    gap: 22px;
     justify-self: start;
+    margin-left: 30%;
+    align-items: center;
   }
   .header-nav a {
-    font-size: 13px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 14px;
     color: #f2ede4;
     text-decoration: none;
-    font-weight: 600;
+    font-weight: 500;
+    letter-spacing: 0.06em;
     white-space: nowrap;
   }
   .header-nav a:hover {
     color: white;
+  }
+  .header-nav .order-now-link {
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: 999px;
+    padding: 7px 14px;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .header-nav .order-now-link:hover {
+    background: #f2ede4;
+    color: #6e6459;
   }
   .cart-wrap {
     position: relative;
@@ -82,9 +96,14 @@
   @media (max-width: 420px) {
     .header-nav {
       gap: 10px;
+      margin-left: 0;
     }
     .header-nav a {
-      font-size: 12px;
+      font-size: 11px;
+      letter-spacing: 0.02em;
+    }
+    .header-nav .order-now-link {
+      padding: 5px 8px;
     }
     .header-logo {
       width: 92px;
@@ -301,6 +320,61 @@
     width: 100%;
     height: auto;
   }
+  .story-section {
+    padding: 76px 24px;
+    scroll-margin-top: 92px;
+  }
+  .story-section.about-section {
+    background: #f7f3ec;
+  }
+  .story-section.menu-intro-section {
+    background: #ddd5c8;
+  }
+  .story-inner {
+    max-width: 920px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .story-eyebrow {
+    margin: 0 0 10px;
+    color: #9a8a75;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 13px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .story-title {
+    margin: 0 0 20px;
+    color: #4a4037;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(34px, 5vw, 58px);
+    font-weight: 400;
+    letter-spacing: 0.04em;
+  }
+  .story-copy {
+    max-width: 680px;
+    margin: 0 auto;
+    color: #6e6459;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.8;
+  }
+  .story-button {
+    display: inline-block;
+    margin-top: 28px;
+    border: 1px solid #877d70;
+    border-radius: 999px;
+    padding: 11px 24px;
+    color: #6e6459;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    text-decoration: none;
+  }
+  .story-button:hover {
+    background: #877d70;
+    color: white;
+  }
   .category-nav {
     position: sticky;
     top: 0;
@@ -346,6 +420,7 @@
   }
   .content {
     padding: 20px;
+    scroll-margin-top: 100px;
   }
   .content-inner {
     max-width: 1000px;
@@ -875,8 +950,9 @@
 <div class="header" id="siteHeader">
   <div class="header-inner">
     <nav class="header-nav">
-      <a href="#menu">Menu</a>
       <a href="#about">About</a>
+      <a href="#menu">Menu</a>
+      <a class="order-now-link" href="#order">Order Now</a>
     </nav>
     <div class="header-logo">
       <img src="/images/jeno-logo.png?v=20260725-3" alt="JÉNO Pâtisserie">
@@ -985,13 +1061,37 @@
   </div>
 </div>
 
+<section class="story-section about-section" id="about">
+  <div class="story-inner">
+    <p class="story-eyebrow">Our story</p>
+    <h2 class="story-title">About JÉNO</h2>
+    <p class="story-copy">
+      JÉNO is a small-batch pâtisserie devoted to thoughtfully made cakes,
+      cinnamon rolls and tiramisu. Every dessert is prepared with care,
+      balanced flavours and a quiet sense of occasion.
+    </p>
+  </div>
+</section>
+
+<section class="story-section menu-intro-section" id="menu">
+  <div class="story-inner">
+    <p class="story-eyebrow">Made to order</p>
+    <h2 class="story-title">Our Menu</h2>
+    <p class="story-copy">
+      Explore our seasonal selection, choose your preferred size or quantity,
+      and reserve your order for pickup or delivery.
+    </p>
+    <a class="story-button" href="#order">View the order menu</a>
+  </div>
+</section>
+
 <div class="category-nav" id="categoryNav">
   <div class="category-nav-inner" id="categoryNavInner">
     <!-- Filled in dynamically once products load -->
   </div>
 </div>
 
-<div class="content" id="menu">
+<div class="content" id="order">
 <div class="content-inner" id="menuContentInner">
   <p style="text-align:center; color:#877d70;">Loading menu...</p>
 </div>
