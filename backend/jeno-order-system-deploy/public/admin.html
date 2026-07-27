@@ -294,6 +294,19 @@
   .variant-row > div:nth-child(2) {
     flex: 1;
   }
+  .variant-availability {
+    flex: 0 0 110px;
+  }
+  .variant-availability label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 42px;
+    margin: 0;
+  }
+  .variant-availability input {
+    width: auto;
+  }
   .variant-remove {
     flex: 0 0 auto;
   }
@@ -421,6 +434,16 @@
       <div>
         <label for="productName">Product Name</label>
         <input type="text" id="productName" placeholder="e.g. Chocolate Cake">
+      </div>
+    </div>
+    <div class="form-row full">
+      <div>
+        <label for="productStatus">Selling status</label>
+        <select id="productStatus">
+          <option value="active">Active — visible and available</option>
+          <option value="sold_out">Sold out — visible but unavailable</option>
+          <option value="hidden">Hidden — not shown to customers</option>
+        </select>
       </div>
     </div>
     <div class="form-row full">
@@ -589,7 +612,12 @@
         { method: "DELETE" }
       );
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "Could not delete member.");
+      if (!response.ok) {
+        if (response.status === 404 && !data.error) {
+          throw new Error("The updated server.js is not deployed yet. Upload it and deploy the latest commit.");
+        }
+        throw new Error(data.error || "Could not delete member. Server response: " + response.status);
+      }
       await loadMembers();
       alert("Member deleted. Existing orders were kept.");
     } catch (error) {
@@ -864,15 +892,19 @@
     for (const category in groups) {
       html += '<div class="category-group">';
       html += "<h3>" + escapeHtml(category) + "</h3>";
-      html += "<table><thead><tr><th>Name</th><th>Price</th><th></th></tr></thead><tbody>";
+      html += "<table><thead><tr><th>Name</th><th>Status</th><th>Price</th><th></th></tr></thead><tbody>";
 
 
       for (const p of groups[category]) {
         html += "<tr>";
         html += "<td>" + escapeHtml(p.name) + "</td>";
+        const productStatus = p.status || "active";
+        const statusLabels = { active: "Active", sold_out: "Sold out", hidden: "Hidden" };
+        html += "<td>" + statusLabels[productStatus] + "</td>";
         const priceSummary = Array.isArray(p.options) && p.options.length
           ? p.options.map((option) =>
-              escapeHtml(option.label) + " $" + Number(option.price).toFixed(2)
+              escapeHtml(option.label) + " $" + Number(option.price).toFixed(2) +
+              (option.available === false ? " — Sold out" : "")
             ).join("<br>")
           : "$" + Number(p.price).toFixed(2);
         html += "<td>" + priceSummary + "</td>";
@@ -929,6 +961,8 @@
         '<div><label>Price ($)</label><input class="variant-price" type="number" ' +
         'min="0" step="0.01" value="' +
         (option.price === "" ? "" : Number(option.price)) + '"></div>' +
+        '<div class="variant-availability"><label><input class="variant-available" type="checkbox" ' +
+        (option.available === false ? "" : "checked") + '> Available</label></div>' +
         '<button class="btn btn-danger btn-small variant-remove" type="button" ' +
         'onclick="removeVariantRow(this)">Remove</button>' +
       "</div>"
@@ -942,6 +976,7 @@
     wrapper.innerHTML =
       '<div><label>Subcategory</label><input class="variant-label" type="text" placeholder="e.g. 4&quot;"></div>' +
       '<div><label>Price ($)</label><input class="variant-price" type="number" min="0" step="0.01"></div>' +
+      '<div class="variant-availability"><label><input class="variant-available" type="checkbox" checked> Available</label></div>' +
       '<button class="btn btn-danger btn-small variant-remove" type="button" onclick="removeVariantRow(this)">Remove</button>';
     document.getElementById("variantRows").appendChild(wrapper);
   }
@@ -971,6 +1006,7 @@
         value: slugOption(label, index),
         label,
         price,
+        available: row.querySelector(".variant-available").checked,
       };
     });
   }
@@ -1072,6 +1108,7 @@
     const name = document.getElementById("productName").value.trim();
     const image = document.getElementById("productImage").value.trim();
     const description = document.getElementById("productDescription").value.trim();
+    const status = document.getElementById("productStatus").value;
     const existingProduct = editingProductId
       ? allProducts.find((product) => product.id === editingProductId)
       : null;
@@ -1096,6 +1133,7 @@
       name,
       image,
       description,
+      status,
       emoji,
       price: options[0].price,
       optionType: optionTypeForCategory(category),
@@ -1153,6 +1191,7 @@
     document.getElementById("productImageFile").value = "";
     showImagePreview(product.image || "");
     document.getElementById("productDescription").value = product.description || "";
+    document.getElementById("productStatus").value = product.status || "active";
     renderVariantRows(
       Array.isArray(product.options) && product.options.length
         ? product.options
@@ -1173,6 +1212,7 @@
     document.getElementById("productImageFile").value = "";
     showImagePreview("");
     document.getElementById("productDescription").value = "";
+    document.getElementById("productStatus").value = "active";
     renderVariantRows(categoryDefaults("Cakes"));
   }
 

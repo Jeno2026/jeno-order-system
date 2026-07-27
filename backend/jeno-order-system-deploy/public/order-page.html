@@ -435,6 +435,19 @@
   .card.added .card-body {
     background: #eef3ed;
   }
+  .card.sold-out {
+    cursor: not-allowed;
+    opacity: 0.68;
+  }
+  .card.sold-out:hover {
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .sold-out-label {
+    color: #a04f47;
+    font-size: 12px;
+    font-weight: 700;
+    margin: 5px 0 0;
+  }
   .product-detail {
     display: none;
     position: fixed;
@@ -540,6 +553,11 @@
     background: #877d70;
     border-color: #877d70;
   }
+  .size-option:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    text-decoration: line-through;
+  }
   .detail-add-btn {
     margin-top: auto;
     width: 100%;
@@ -554,6 +572,10 @@
   }
   .detail-add-btn:hover {
     background: #6e6459;
+  }
+  .detail-add-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
   }
   .quantity-row {
     display: none;
@@ -1454,7 +1476,9 @@
 
   // ---------- Render the sticky category navigation links ----------
   function renderCategoryNav() {
-    const categories = [...new Set(allProducts.map((p) => p.category))];
+    const categories = [...new Set(
+      allProducts.filter((p) => p.status !== "hidden").map((p) => p.category)
+    )];
     let html = "";
     for (const category of categories) {
       html += '<a href="#' + slugify(category) + '">' + escapeHtml(category) + "</a>";
@@ -1465,7 +1489,7 @@
   // ---------- Render the menu, grouped by category, as product cards ----------
   function renderMenu() {
     const groups = {};
-    for (const p of allProducts) {
+    for (const p of allProducts.filter((product) => product.status !== "hidden")) {
       if (!groups[p.category]) groups[p.category] = [];
       groups[p.category].push(p);
     }
@@ -1480,11 +1504,13 @@
         const cardId = "card_" + p.id;
         const detail = getProductDetail(p);
         const hasDetail = Boolean(detail);
-        const action = hasDetail
+        const soldOut = p.status === "sold_out";
+        const action = soldOut ? "" : hasDetail
           ? "openProductDetail('" + p.id + "')"
           : "addToCart('" + p.id + "', '" +
             escapeHtml(p.name).replace(/'/g, "\\'") + "', " + p.price + ", '" + cardId + "')";
-        html += '<div class="card" id="' + cardId + '" onclick="' + action + '">';
+        html += '<div class="card' + (soldOut ? " sold-out" : "") + '" id="' + cardId + '"' +
+          (action ? ' onclick="' + action + '"' : "") + '>';
         html += '<div class="card-img">' +
           (hasDetail
             ? detail.image
@@ -1497,6 +1523,7 @@
           (p.optionType === "size" || cakeDetails[p.id] ? "From $" +
             Number((p.options && p.options[0] ? p.options[0].price : 35)).toFixed(2)
             : "$" + Number(p.price).toFixed(2)) + "</p>";
+        if (soldOut) html += '<p class="sold-out-label">Sold out</p>';
         html += "</div></div>";
       }
 
@@ -1521,7 +1548,7 @@
   function openProductDetail(productId) {
     const product = allProducts.find((item) => item.id === productId);
     const detail = getProductDetail(product);
-    if (!product || !detail) return;
+    if (!product || !detail || (product.status || "active") !== "active") return;
 
     activeProduct = product;
     activeProductType = product.optionType === "size"
@@ -1530,11 +1557,14 @@
       : product.optionType === "quantity" ? "tiramisu"
       : cakeDetails[productId] ? "cake"
       : rollDetails[productId] ? "roll" : "tiramisu";
-    selectedCakeSize = product.options && product.options[0]
-      ? product.options[0].label
+    const firstAvailableOption = Array.isArray(product.options)
+      ? product.options.find((option) => option.available !== false)
+      : null;
+    selectedCakeSize = firstAvailableOption
+      ? firstAvailableOption.label
       : '4"';
-    selectedRollPack = product.options && product.options[0]
-      ? product.options[0].value
+    selectedRollPack = firstAvailableOption
+      ? firstAvailableOption.value
       : "single";
     detailQuantity = 1;
     document.getElementById("detailTitle").innerText = product.name;
@@ -1579,10 +1609,15 @@
         : cakeSizes;
       document.getElementById("sizeOptions").innerHTML = sizeOptions.map((size, index) =>
         '<button class="size-option' + (size.label === selectedCakeSize ? " selected" : "") +
-        '" onclick="selectCakeSize(' + index + ')">' +
-        size.label + "<br>$" + size.price.toFixed(2) + "</button>"
+        '" onclick="selectCakeSize(' + index + ')"' +
+        (size.available === false ? " disabled" : "") + ">" +
+        size.label + "<br>$" + size.price.toFixed(2) +
+        (size.available === false ? "<br>Sold out" : "") + "</button>"
       ).join("");
-      selectedPrice = sizeOptions.find((size) => size.label === selectedCakeSize).price;
+      const selected = sizeOptions.find((size) =>
+        size.label === selectedCakeSize && size.available !== false
+      );
+      selectedPrice = selected ? Number(selected.price) : 0;
     } else if (activeProductType === "roll") {
       const singlePrice = Number(activeProduct.price);
       const rollPacks = activeProduct.options && activeProduct.options.length
@@ -1598,10 +1633,15 @@
       document.getElementById("detailQuantity").innerText = detailQuantity;
       document.getElementById("sizeOptions").innerHTML = rollPacks.map((pack, index) =>
         '<button class="size-option' + (pack.value === selectedRollPack ? " selected" : "") +
-        '" onclick="selectRollPack(' + index + ')">' +
-        pack.label + "<br>$" + pack.price.toFixed(2) + "</button>"
+        '" onclick="selectRollPack(' + index + ')"' +
+        (pack.available === false ? " disabled" : "") + ">" +
+        pack.label + "<br>$" + pack.price.toFixed(2) +
+        (pack.available === false ? "<br>Sold out" : "") + "</button>"
       ).join("");
-      selectedPrice = rollPacks.find((pack) => pack.value === selectedRollPack).price;
+      const selected = rollPacks.find((pack) =>
+        pack.value === selectedRollPack && pack.available !== false
+      );
+      selectedPrice = selected ? Number(selected.price) : 0;
     } else {
       optionLabel.style.display = "none";
       document.getElementById("sizeOptions").style.display = "none";
@@ -1611,14 +1651,18 @@
       selectedPrice = Number(activeProduct.price);
     }
 
-    document.getElementById("detailAddButton").innerText =
-      "Add to cart — $" + (selectedPrice * detailQuantity).toFixed(2);
+    const addButton = document.getElementById("detailAddButton");
+    addButton.disabled = selectedPrice <= 0;
+    addButton.innerText = selectedPrice > 0
+      ? "Add to cart — $" + (selectedPrice * detailQuantity).toFixed(2)
+      : "Sold out";
   }
 
   function selectCakeSize(sizeIndex) {
     const sizeOptions = activeProduct.options && activeProduct.options.length
       ? activeProduct.options
       : cakeSizes;
+    if (sizeOptions[sizeIndex].available === false) return;
     selectedCakeSize = sizeOptions[sizeIndex].label;
     renderProductOptions();
   }
@@ -1627,6 +1671,7 @@
     const rollPacks = activeProduct.options && activeProduct.options.length
       ? activeProduct.options
       : [{ value: "single" }, { value: "dozen" }];
+    if (rollPacks[packIndex].available === false) return;
     selectedRollPack = rollPacks[packIndex].value;
     renderProductOptions();
   }
@@ -1638,6 +1683,7 @@
 
   function addConfiguredProduct() {
     if (!activeProduct) return;
+    if ((activeProduct.status || "active") !== "active") return;
 
     let optionName;
     let price;
@@ -1646,6 +1692,7 @@
         ? activeProduct.options
         : cakeSizes;
       const selected = sizeOptions.find((size) => size.label === selectedCakeSize);
+      if (!selected || selected.available === false) return;
       optionName = selectedCakeSize;
       price = selected.price;
     } else if (activeProductType === "roll") {
@@ -1656,6 +1703,7 @@
           { value: "dozen", label: "Dozen (12)", price: Number(activeProduct.price) * 12 },
         ];
       const selected = rollPacks.find((pack) => pack.value === selectedRollPack);
+      if (!selected || selected.available === false) return;
       optionName = selected.label;
       price = Number(selected.price);
     } else {
@@ -1671,6 +1719,10 @@
         name: activeProduct.name + " — " + optionName,
         price: price,
         qty: detailQuantity,
+        productId: activeProduct.id,
+        optionValue: activeProductType === "cake"
+          ? (activeProduct.options || []).find((option) => option.label === selectedCakeSize)?.value
+          : activeProductType === "roll" ? selectedRollPack : null,
       };
     }
     updateCartBadge();
@@ -1689,10 +1741,12 @@
 
   // ---------- Cart interactions ----------
   function addToCart(id, name, price, cardId) {
+    const product = allProducts.find((item) => item.id === id);
+    if (!product || (product.status || "active") !== "active") return;
     if (cart[id]) {
       cart[id].qty += 1;
     } else {
-      cart[id] = { name: name, price: price, qty: 1 };
+      cart[id] = { name: name, price: price, qty: 1, productId: id, optionValue: null };
     }
 
     updateCartBadge();
@@ -1835,9 +1889,8 @@
         }),
       });
 
-      if (!res.ok) throw new Error("Order failed");
-
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Order failed");
       currentOrder = data.order;
       document.getElementById("transferOrderId").textContent = currentOrder.id;
       document.getElementById("transferAmount").textContent = "$" + Number(total).toFixed(2);
@@ -1854,7 +1907,7 @@
       renderCartPanel();
       window.scrollTo(0, 0);
     } catch (err) {
-      alert("Something went wrong creating your order. Please try again.");
+      alert(err.message || "Something went wrong creating your order. Please try again.");
     } finally {
       button.disabled = false;
       button.textContent = "Place Order";
