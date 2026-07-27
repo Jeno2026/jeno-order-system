@@ -1148,26 +1148,26 @@
   <div class="footer-inner">
     <div>
       <p class="footer-title">Contact Us</p>
-      <p>123 Main Street, Richmond, BC<br>
-      (604) 555-0123<br>
-      hello@jenopatisserie.com</p>
+      <p><span id="footerAddress">123 Main Street, Richmond, BC</span><br>
+      <span id="footerPhone">(604) 555-0123</span><br>
+      <span id="footerEmail">hello@jenopatisserie.com</span></p>
     </div>
     <div>
       <p class="footer-title">Hours</p>
-      <p>Mon - Fri: 8am - 6pm<br>
-      Sat - Sun: 9am - 5pm</p>
+      <p><span id="footerWeekdayHours">Mon - Fri: 8am - 6pm</span><br>
+      <span id="footerWeekendHours">Sat - Sun: 9am - 5pm</span></p>
     </div>
     <div>
       <p class="footer-title">Follow Us</p>
       <div class="footer-social">
-        <a href="#" aria-label="Instagram">
+        <a id="footerInstagram" href="#" aria-label="Instagram" target="_blank" rel="noopener">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="3" y="3" width="18" height="18" rx="5" stroke="white" stroke-width="2"/>
             <circle cx="12" cy="12" r="4" stroke="white" stroke-width="2"/>
             <circle cx="17.5" cy="6.5" r="1.2" fill="white"/>
           </svg>
         </a>
-        <a href="#" aria-label="Facebook">
+        <a id="footerFacebook" href="#" aria-label="Facebook" target="_blank" rel="noopener">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M14 9H16.5V6H14C12.34 6 11 7.34 11 9V11H9V14H11V19H14V14H16L16.5 11H14V9.5C14 9.22 14.22 9 14 9Z" fill="white"/>
           </svg>
@@ -1602,6 +1602,7 @@
       const response = await fetch("/api/store-settings");
       if (!response.ok) throw new Error("Could not load ordering settings.");
       storeSettings = await response.json();
+      updateFooter(storeSettings);
       const timeSelect = document.getElementById("fulfillmentTime");
       timeSelect.innerHTML = '<option value="">Choose a time</option>' +
         storeSettings.pickupTimes.map((time) =>
@@ -1613,6 +1614,27 @@
       document.getElementById("fulfillmentAvailabilityMessage").textContent =
         "Ordering availability could not be loaded. Please refresh the page.";
     }
+  }
+
+  function updateFooter(settings) {
+    const textValues = {
+      footerAddress: settings.contactAddress,
+      footerPhone: settings.contactPhone,
+      footerEmail: settings.contactEmail,
+      footerWeekdayHours: settings.weekdayHours,
+      footerWeekendHours: settings.weekendHours,
+    };
+    Object.entries(textValues).forEach(([id, value]) => {
+      document.getElementById(id).textContent = value || "";
+    });
+    [
+      ["footerInstagram", settings.instagramUrl],
+      ["footerFacebook", settings.facebookUrl],
+    ].forEach(([id, url]) => {
+      const link = document.getElementById(id);
+      link.href = url || "#";
+      link.style.display = url ? "flex" : "none";
+    });
   }
 
   function validateSelectedFulfillmentDate() {

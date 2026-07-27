@@ -623,6 +623,43 @@
           <p class="upload-note">Enter one 24-hour time per line.</p>
         </div>
       </div>
+      <h2 style="margin-top:32px;">Footer Settings</h2>
+      <div class="form-row">
+        <div>
+          <label for="contactAddress">Address</label>
+          <input id="contactAddress" placeholder="123 Main Street, Richmond, BC">
+        </div>
+        <div>
+          <label for="contactPhone">Phone</label>
+          <input id="contactPhone" placeholder="(604) 555-0123">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div>
+          <label for="contactEmail">Contact email</label>
+          <input id="contactEmail" type="email" placeholder="hello@jenopatisserie.com">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label for="weekdayHours">Weekday hours</label>
+          <input id="weekdayHours" placeholder="Mon - Fri: 8am - 6pm">
+        </div>
+        <div>
+          <label for="weekendHours">Weekend hours</label>
+          <input id="weekendHours" placeholder="Sat - Sun: 9am - 5pm">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label for="instagramUrl">Instagram URL</label>
+          <input id="instagramUrl" type="url" placeholder="https://instagram.com/your-account">
+        </div>
+        <div>
+          <label for="facebookUrl">Facebook URL</label>
+          <input id="facebookUrl" type="url" placeholder="https://facebook.com/your-page">
+        </div>
+      </div>
       <div class="form-actions">
         <button class="btn btn-primary" onclick="saveStoreSettings()">Save Settings</button>
       </div>
@@ -770,6 +807,13 @@
       });
       document.getElementById("blackoutDates").value = settings.blackoutDates.join("\n");
       document.getElementById("pickupTimes").value = settings.pickupTimes.join("\n");
+      document.getElementById("contactAddress").value = settings.contactAddress || "";
+      document.getElementById("contactPhone").value = settings.contactPhone || "";
+      document.getElementById("contactEmail").value = settings.contactEmail || "";
+      document.getElementById("weekdayHours").value = settings.weekdayHours || "";
+      document.getElementById("weekendHours").value = settings.weekendHours || "";
+      document.getElementById("instagramUrl").value = settings.instagramUrl || "";
+      document.getElementById("facebookUrl").value = settings.facebookUrl || "";
     } catch (error) {
       showSettingsStatus(error.message, "error");
     }
@@ -785,6 +829,13 @@
         .map((checkbox) => Number(checkbox.value)),
       blackoutDates: lines("blackoutDates"),
       pickupTimes: lines("pickupTimes"),
+      contactAddress: document.getElementById("contactAddress").value.trim(),
+      contactPhone: document.getElementById("contactPhone").value.trim(),
+      contactEmail: document.getElementById("contactEmail").value.trim(),
+      weekdayHours: document.getElementById("weekdayHours").value.trim(),
+      weekendHours: document.getElementById("weekendHours").value.trim(),
+      instagramUrl: document.getElementById("instagramUrl").value.trim(),
+      facebookUrl: document.getElementById("facebookUrl").value.trim(),
     };
     try {
       const response = await fetch("/api/admin/store-settings", {
