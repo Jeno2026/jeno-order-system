@@ -33,6 +33,13 @@ const pool = DATABASE_URL
       ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
     })
   : null;
+const DEFAULT_STORE_SETTINGS = {
+  minLeadDays: 2,
+  closedWeekdays: [0],
+  blackoutDates: [],
+  dailyOrderLimit: 10,
+  pickupTimes: ["10:00", "12:00", "14:00", "16:00"],
+};
 
 
 // ---------- 小工具函式 ----------
@@ -185,7 +192,17 @@ async function initializeMemberDatabase() {
     CREATE INDEX IF NOT EXISTS orders_member_id_idx ON orders(member_id);
     CREATE INDEX IF NOT EXISTS orders_customer_email_idx ON orders(customer_email);
     CREATE INDEX IF NOT EXISTS orders_created_at_idx ON orders(created_at);
+    CREATE TABLE IF NOT EXISTS store_settings (
+      key TEXT PRIMARY KEY,
+      data JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
+  await pool.query(
+    `INSERT INTO store_settings (key, data) VALUES ('ordering', $1::jsonb)
+     ON CONFLICT (key) DO NOTHING`,
+    [JSON.stringify(DEFAULT_STORE_SETTINGS)]
+  );
   await pool.query("DELETE FROM member_sessions WHERE expires_at <= NOW()");
   await migrateJsonDataToPostgres();
 }
@@ -254,6 +271,53 @@ async function saveOrderToDatabase(order) {
       order.createdAt || null,
     ]
   );
+}
+
+function sanitizeStoreSettings(input) {
+  const closedWeekdays = Array.isArray(input.closedWeekdays)
+    ? [...new Set(input.closedWeekdays.map(Number).filter((day) => day >= 0 && day <= 6))]
+    : [];
+  const blackoutDates = Array.isArray(input.blackoutDates)
+    ? [...new Set(input.blackoutDates.map(String).filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)))]
+    : [];
+  const pickupTimes = Array.isArray(input.pickupTimes)
+    ? [...new Set(input.pickupTimes.map(String).filter((time) => /^\d{2}:\d{2}$/.test(time)))]
+    : [];
+  return {
+    minLeadDays: Math.max(0, Math.min(60, Number(input.minLeadDays) || 0)),
+    closedWeekdays,
+    blackoutDates,
+    dailyOrderLimit: Math.max(1, Math.min(500, Number(input.dailyOrderLimit) || 1)),
+    pickupTimes,
+  };
+}
+
+async function getStoreSettings() {
+  const result = await pool.query("SELECT data FROM store_settings WHERE key = 'ordering'");
+  return sanitizeStoreSettings(result.rows[0] ? result.rows[0].data : DEFAULT_STORE_SETTINGS);
+}
+
+function dateStringFromToday(daysToAdd) {
+  const date = new Date();
+  date.setUTCHours(12, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + daysToAdd);
+  return date.toISOString().slice(0, 10);
+}
+
+function validateFulfillmentDate(settings, fulfillmentDate, fulfillmentTime) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fulfillmentDate || ""))) {
+    return "Please choose a valid pickup or delivery date.";
+  }
+  if (fulfillmentDate < dateStringFromToday(settings.minLeadDays)) {
+    return `Orders require at least ${settings.minLeadDays} day(s) notice.`;
+  }
+  const weekday = new Date(fulfillmentDate + "T12:00:00Z").getUTCDay();
+  if (settings.closedWeekdays.includes(weekday)) return "The store is closed on the selected date.";
+  if (settings.blackoutDates.includes(fulfillmentDate)) return "The selected date is unavailable.";
+  if (settings.pickupTimes.length && !settings.pickupTimes.includes(String(fulfillmentTime || ""))) {
+    return "Please choose one of the available pickup times.";
+  }
+  return null;
 }
 
 function memberCookie(token, maxAge) {
@@ -334,6 +398,23 @@ const server = http.createServer(async (req, res) => {
     // 部署平台可用此端點確認服務仍正常運作
     if (pathname === "/health" && req.method === "GET") {
       return sendJson(res, 200, { status: "ok" });
+    }
+
+    if (pathname === "/api/store-settings" && req.method === "GET") {
+      if (!pool) return sendJson(res, 503, { error: "Database is not configured." });
+      const settings = await getStoreSettings();
+      const counts = await pool.query(
+        `SELECT data #>> '{fulfillment,date}' AS date, COUNT(*)::int AS count
+           FROM orders
+          WHERE data #>> '{fulfillment,date}' >= $1
+            AND COALESCE(data->>'status', '') <> 'cancelled'
+          GROUP BY data #>> '{fulfillment,date}'`,
+        [dateStringFromToday(0)]
+      );
+      const fullyBookedDates = counts.rows
+        .filter((row) => row.date && row.count >= settings.dailyOrderLimit)
+        .map((row) => row.date);
+      return sendJson(res, 200, { ...settings, fullyBookedDates });
     }
 
     // --- 顧客會員系統 ---
@@ -551,6 +632,22 @@ const server = http.createServer(async (req, res) => {
         "Cache-Control": "no-store",
       });
       return res.end(JSON.stringify({ authenticated: false }));
+    }
+
+    if (pathname === "/api/admin/store-settings" && req.method === "PUT") {
+      if (!requireAdmin(req, res)) return;
+      if (!pool) return sendJson(res, 503, { error: "Database is not configured." });
+      const settings = sanitizeStoreSettings(await readRequestBody(req));
+      if (!settings.pickupTimes.length) {
+        return sendJson(res, 400, { error: "Add at least one pickup time." });
+      }
+      await pool.query(
+        `INSERT INTO store_settings (key, data, updated_at)
+         VALUES ('ordering', $1::jsonb, NOW())
+         ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+        [JSON.stringify(settings)]
+      );
+      return sendJson(res, 200, { message: "Ordering settings saved.", settings });
     }
 
     if (pathname === "/admin.html" && req.method === "GET" && !getAdminSession(req)) {
@@ -801,6 +898,24 @@ const server = http.createServer(async (req, res) => {
       }
       if (body.fulfillment.method === "delivery" && !body.fulfillment.address) {
         return sendJson(res, 400, { error: "Delivery address is required." });
+      }
+      if (!getAdminSession(req)) {
+        const settings = await getStoreSettings();
+        const dateError = validateFulfillmentDate(
+          settings,
+          body.fulfillment.date,
+          body.fulfillment.time
+        );
+        if (dateError) return sendJson(res, 409, { error: dateError });
+        const countResult = await pool.query(
+          `SELECT COUNT(*)::int AS count FROM orders
+            WHERE data #>> '{fulfillment,date}' = $1
+              AND COALESCE(data->>'status', '') <> 'cancelled'`,
+          [body.fulfillment.date]
+        );
+        if (countResult.rows[0].count >= settings.dailyOrderLimit) {
+          return sendJson(res, 409, { error: "The selected date is fully booked." });
+        }
       }
 
 
