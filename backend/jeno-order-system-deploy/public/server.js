@@ -33,6 +33,20 @@ const pool = DATABASE_URL
       ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
     })
   : null;
+const DEFAULT_STORE_SETTINGS = {
+  minLeadDays: 2,
+  closedWeekdays: [0],
+  blackoutDates: [],
+  dailyOrderLimit: 10,
+  pickupTimes: ["10:00", "12:00", "14:00", "16:00"],
+  contactAddress: "123 Main Street, Richmond, BC",
+  contactPhone: "(604) 555-0123",
+  contactEmail: "hello@jenopatisserie.com",
+  weekdayHours: "Mon - Fri: 8am - 6pm",
+  weekendHours: "Sat - Sun: 9am - 5pm",
+  instagramUrl: "",
+  facebookUrl: "",
+};
 
 
 // ---------- 小工具函式 ----------
@@ -167,8 +181,163 @@ async function initializeMemberDatabase() {
     );
     CREATE INDEX IF NOT EXISTS member_sessions_member_id_idx
       ON member_sessions(member_id);
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      data JSONB NOT NULL,
+      sort_order BIGSERIAL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS orders (
+      id TEXT PRIMARY KEY,
+      member_id TEXT,
+      customer_email TEXT,
+      data JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS orders_member_id_idx ON orders(member_id);
+    CREATE INDEX IF NOT EXISTS orders_customer_email_idx ON orders(customer_email);
+    CREATE INDEX IF NOT EXISTS orders_created_at_idx ON orders(created_at);
+    CREATE TABLE IF NOT EXISTS store_settings (
+      key TEXT PRIMARY KEY,
+      data JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
+  await pool.query(
+    `INSERT INTO store_settings (key, data) VALUES ('ordering', $1::jsonb)
+     ON CONFLICT (key) DO NOTHING`,
+    [JSON.stringify(DEFAULT_STORE_SETTINGS)]
+  );
   await pool.query("DELETE FROM member_sessions WHERE expires_at <= NOW()");
+  await migrateJsonDataToPostgres();
+}
+
+async function migrateJsonDataToPostgres() {
+  const productCount = Number((await pool.query("SELECT COUNT(*) FROM products")).rows[0].count);
+  if (productCount === 0 && fs.existsSync(PRODUCTS_FILE)) {
+    const products = readJsonFile(PRODUCTS_FILE);
+    for (const product of products) {
+      if (!product || !product.id) continue;
+      await pool.query(
+        "INSERT INTO products (id, data) VALUES ($1, $2::jsonb) ON CONFLICT (id) DO NOTHING",
+        [String(product.id), JSON.stringify(product)]
+      );
+    }
+    console.log(`Migrated ${products.length} products from JSON to PostgreSQL.`);
+  }
+
+  const orderCount = Number((await pool.query("SELECT COUNT(*) FROM orders")).rows[0].count);
+  if (orderCount === 0 && fs.existsSync(ORDERS_FILE)) {
+    const orders = readJsonFile(ORDERS_FILE);
+    for (const order of orders) {
+      if (!order || !order.id) continue;
+      await pool.query(
+        `INSERT INTO orders (id, member_id, customer_email, data, created_at, updated_at)
+         VALUES ($1, $2, $3, $4::jsonb, COALESCE($5::timestamptz, NOW()), COALESCE($6::timestamptz, NOW()))
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          String(order.id),
+          order.memberId || null,
+          normalizeEmail(order.customer && order.customer.email) || null,
+          JSON.stringify(order),
+          order.createdAt || null,
+          order.updatedAt || order.createdAt || null,
+        ]
+      );
+    }
+    console.log(`Migrated ${orders.length} orders from JSON to PostgreSQL.`);
+  }
+}
+
+async function getProductsFromDatabase() {
+  const result = await pool.query("SELECT data FROM products ORDER BY sort_order ASC, created_at ASC");
+  return result.rows.map((row) => row.data);
+}
+
+async function getOrdersFromDatabase() {
+  const result = await pool.query("SELECT data FROM orders ORDER BY created_at ASC");
+  return result.rows.map((row) => row.data);
+}
+
+async function saveOrderToDatabase(order) {
+  await pool.query(
+    `INSERT INTO orders (id, member_id, customer_email, data, created_at, updated_at)
+     VALUES ($1, $2, $3, $4::jsonb, COALESCE($5::timestamptz, NOW()), NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       member_id = EXCLUDED.member_id,
+       customer_email = EXCLUDED.customer_email,
+       data = EXCLUDED.data,
+       updated_at = NOW()`,
+    [
+      String(order.id),
+      order.memberId || null,
+      normalizeEmail(order.customer && order.customer.email) || null,
+      JSON.stringify(order),
+      order.createdAt || null,
+    ]
+  );
+}
+
+function sanitizeStoreSettings(input) {
+  const cleanText = (value, fallback, maxLength = 250) =>
+    String(value === undefined ? fallback : value).trim().slice(0, maxLength);
+  const cleanUrl = (value) => {
+    const url = String(value || "").trim().slice(0, 500);
+    return !url || /^https:\/\/[^\s]+$/i.test(url) ? url : "";
+  };
+  const closedWeekdays = Array.isArray(input.closedWeekdays)
+    ? [...new Set(input.closedWeekdays.map(Number).filter((day) => day >= 0 && day <= 6))]
+    : [];
+  const blackoutDates = Array.isArray(input.blackoutDates)
+    ? [...new Set(input.blackoutDates.map(String).filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)))]
+    : [];
+  const pickupTimes = Array.isArray(input.pickupTimes)
+    ? [...new Set(input.pickupTimes.map(String).filter((time) => /^\d{2}:\d{2}$/.test(time)))]
+    : [];
+  return {
+    minLeadDays: Math.max(0, Math.min(60, Number(input.minLeadDays) || 0)),
+    closedWeekdays,
+    blackoutDates,
+    dailyOrderLimit: Math.max(1, Math.min(500, Number(input.dailyOrderLimit) || 1)),
+    pickupTimes,
+    contactAddress: cleanText(input.contactAddress, DEFAULT_STORE_SETTINGS.contactAddress),
+    contactPhone: cleanText(input.contactPhone, DEFAULT_STORE_SETTINGS.contactPhone, 80),
+    contactEmail: cleanText(input.contactEmail, DEFAULT_STORE_SETTINGS.contactEmail, 160),
+    weekdayHours: cleanText(input.weekdayHours, DEFAULT_STORE_SETTINGS.weekdayHours),
+    weekendHours: cleanText(input.weekendHours, DEFAULT_STORE_SETTINGS.weekendHours),
+    instagramUrl: cleanUrl(input.instagramUrl),
+    facebookUrl: cleanUrl(input.facebookUrl),
+  };
+}
+
+async function getStoreSettings() {
+  const result = await pool.query("SELECT data FROM store_settings WHERE key = 'ordering'");
+  return sanitizeStoreSettings(result.rows[0] ? result.rows[0].data : DEFAULT_STORE_SETTINGS);
+}
+
+function dateStringFromToday(daysToAdd) {
+  const date = new Date();
+  date.setUTCHours(12, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + daysToAdd);
+  return date.toISOString().slice(0, 10);
+}
+
+function validateFulfillmentDate(settings, fulfillmentDate, fulfillmentTime) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fulfillmentDate || ""))) {
+    return "Please choose a valid pickup or delivery date.";
+  }
+  if (fulfillmentDate < dateStringFromToday(settings.minLeadDays)) {
+    return `Orders require at least ${settings.minLeadDays} day(s) notice.`;
+  }
+  const weekday = new Date(fulfillmentDate + "T12:00:00Z").getUTCDay();
+  if (settings.closedWeekdays.includes(weekday)) return "The store is closed on the selected date.";
+  if (settings.blackoutDates.includes(fulfillmentDate)) return "The selected date is unavailable.";
+  if (settings.pickupTimes.length && !settings.pickupTimes.includes(String(fulfillmentTime || ""))) {
+    return "Please choose one of the available pickup times.";
+  }
+  return null;
 }
 
 function memberCookie(token, maxAge) {
@@ -249,6 +418,23 @@ const server = http.createServer(async (req, res) => {
     // 部署平台可用此端點確認服務仍正常運作
     if (pathname === "/health" && req.method === "GET") {
       return sendJson(res, 200, { status: "ok" });
+    }
+
+    if (pathname === "/api/store-settings" && req.method === "GET") {
+      if (!pool) return sendJson(res, 503, { error: "Database is not configured." });
+      const settings = await getStoreSettings();
+      const counts = await pool.query(
+        `SELECT data #>> '{fulfillment,date}' AS date, COUNT(*)::int AS count
+           FROM orders
+          WHERE data #>> '{fulfillment,date}' >= $1
+            AND COALESCE(data->>'status', '') <> 'cancelled'
+          GROUP BY data #>> '{fulfillment,date}'`,
+        [dateStringFromToday(0)]
+      );
+      const fullyBookedDates = counts.rows
+        .filter((row) => row.date && row.count >= settings.dailyOrderLimit)
+        .map((row) => row.date);
+      return sendJson(res, 200, { ...settings, fullyBookedDates });
     }
 
     // --- 顧客會員系統 ---
@@ -398,11 +584,13 @@ const server = http.createServer(async (req, res) => {
     if (pathname === "/api/members/orders" && req.method === "GET") {
       const member = await requireMember(req, res);
       if (!member) return;
-      const orders = readJsonFile(ORDERS_FILE).filter((order) =>
-        order.memberId === member.id ||
-        normalizeEmail(order.customer && order.customer.email) === member.email
+      const result = await pool.query(
+        `SELECT data FROM orders
+         WHERE member_id = $1 OR customer_email = $2
+         ORDER BY created_at DESC`,
+        [member.id, member.email]
       );
-      return sendJson(res, 200, orders.reverse());
+      return sendJson(res, 200, result.rows.map((row) => row.data));
     }
 
     // --- 管理員登入 ---
@@ -466,6 +654,22 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify({ authenticated: false }));
     }
 
+    if (pathname === "/api/admin/store-settings" && req.method === "PUT") {
+      if (!requireAdmin(req, res)) return;
+      if (!pool) return sendJson(res, 503, { error: "Database is not configured." });
+      const settings = sanitizeStoreSettings(await readRequestBody(req));
+      if (!settings.pickupTimes.length) {
+        return sendJson(res, 400, { error: "Add at least one pickup time." });
+      }
+      await pool.query(
+        `INSERT INTO store_settings (key, data, updated_at)
+         VALUES ('ordering', $1::jsonb, NOW())
+         ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+        [JSON.stringify(settings)]
+      );
+      return sendJson(res, 200, { message: "Ordering settings saved.", settings });
+    }
+
     if (pathname === "/admin.html" && req.method === "GET" && !getAdminSession(req)) {
       return redirect(res, "/login.html");
     }
@@ -505,22 +709,77 @@ const server = http.createServer(async (req, res) => {
       if (!requireAdmin(req, res)) return;
       if (!pool) return sendJson(res, 503, { error: "Member database is not configured." });
       const memberId = decodeURIComponent(pathname.split("/")[4]);
-      const result = await pool.query(
-        "DELETE FROM members WHERE id = $1 RETURNING id, email",
-        [memberId]
-      );
-      if (!result.rowCount) return sendJson(res, 404, { error: "Member not found." });
-      return sendJson(res, 200, {
-        message: "Member deleted.",
-        member: result.rows[0],
-      });
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("DELETE FROM member_sessions WHERE member_id = $1", [memberId]);
+        const result = await client.query(
+          "DELETE FROM members WHERE id = $1 RETURNING id, email",
+          [memberId]
+        );
+        if (!result.rowCount) {
+          await client.query("ROLLBACK");
+          return sendJson(res, 404, { error: "Member not found." });
+        }
+        await client.query("COMMIT");
+        return sendJson(res, 200, {
+          message: "Member deleted.",
+          member: result.rows[0],
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("Delete member error:", error);
+        return sendJson(res, 500, {
+          error: "Member could not be deleted because related database records still exist.",
+        });
+      } finally {
+        client.release();
+      }
     }
 
 
     // --- API: 取得所有商品 ---
     if (pathname === "/api/products" && req.method === "GET") {
-      const products = readJsonFile(PRODUCTS_FILE);
+      if (!pool) return sendJson(res, 503, { error: "Database is not configured." });
+      const products = await getProductsFromDatabase();
       return sendJson(res, 200, products);
+    }
+
+    // --- API: 儲存後台指定的商品排列順序 ---
+    if (pathname === "/api/admin/products/reorder" && req.method === "PUT") {
+      if (!requireAdmin(req, res)) return;
+      const body = await readRequestBody(req);
+      const orderedIds = Array.isArray(body.orderedIds)
+        ? [...new Set(body.orderedIds.map(String))]
+        : [];
+      const existingResult = await pool.query(
+        "SELECT id FROM products ORDER BY sort_order ASC, created_at ASC"
+      );
+      const existingIds = existingResult.rows.map((row) => String(row.id));
+      if (
+        orderedIds.length !== existingIds.length ||
+        existingIds.some((id) => !orderedIds.includes(id))
+      ) {
+        return sendJson(res, 400, { error: "The product list changed. Refresh and try again." });
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        for (let index = 0; index < orderedIds.length; index += 1) {
+          await client.query(
+            "UPDATE products SET sort_order = $1, updated_at = NOW() WHERE id = $2",
+            [index + 1, orderedIds[index]]
+          );
+        }
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+      return sendJson(res, 200, { message: "Product order saved." });
     }
 
 
@@ -577,9 +836,6 @@ const server = http.createServer(async (req, res) => {
       }
 
 
-      const products = readJsonFile(PRODUCTS_FILE);
-
-
       const newProduct = {
         id: "item_" + Date.now(), // 用時間戳記產生不會重複的商品編號
         category: body.category,
@@ -589,12 +845,19 @@ const server = http.createServer(async (req, res) => {
         description: body.description || "",
         image: body.image || "",
         optionType: body.optionType || "quantity",
-        options: Array.isArray(body.options) ? body.options : [],
+        status: ["active", "sold_out", "hidden"].includes(body.status) ? body.status : "active",
+        options: Array.isArray(body.options) ? body.options.map((option) => ({
+          value: String(option.value),
+          label: String(option.label),
+          price: Number(option.price),
+          available: option.available !== false,
+        })) : [],
       };
 
-
-      products.push(newProduct);
-      writeJsonFile(PRODUCTS_FILE, products);
+      await pool.query(
+        "INSERT INTO products (id, data) VALUES ($1, $2::jsonb)",
+        [newProduct.id, JSON.stringify(newProduct)]
+      );
 
 
       return sendJson(res, 201, { message: "Product added", product: newProduct });
@@ -608,18 +871,15 @@ const server = http.createServer(async (req, res) => {
       const body = await readRequestBody(req);
 
 
-      const products = readJsonFile(PRODUCTS_FILE);
-      const index = products.findIndex((p) => p.id === id);
-
-
-      if (index === -1) {
+      const existing = await pool.query("SELECT data FROM products WHERE id = $1", [id]);
+      if (!existing.rowCount) {
         return sendJson(res, 404, { error: "Product not found." });
       }
 
 
       // 只更新有傳進來的欄位,其他欄位維持原值
-      products[index] = {
-        ...products[index],
+      const updatedProduct = {
+        ...existing.rows[0].data,
         ...(body.name !== undefined && { name: body.name }),
         ...(body.category !== undefined && { category: body.category }),
         ...(body.price !== undefined && { price: Number(body.price) }),
@@ -627,20 +887,22 @@ const server = http.createServer(async (req, res) => {
         ...(body.description !== undefined && { description: String(body.description) }),
         ...(body.image !== undefined && { image: String(body.image) }),
         ...(body.optionType !== undefined && { optionType: String(body.optionType) }),
+        ...(["active", "sold_out", "hidden"].includes(body.status) && { status: body.status }),
         ...(Array.isArray(body.options) && {
           options: body.options.map((option) => ({
             value: String(option.value),
             label: String(option.label),
             price: Number(option.price),
+            available: option.available !== false,
           })),
         }),
       };
 
-
-      writeJsonFile(PRODUCTS_FILE, products);
-
-
-      return sendJson(res, 200, { message: "Product updated", product: products[index] });
+      await pool.query(
+        "UPDATE products SET data = $1::jsonb, updated_at = NOW() WHERE id = $2",
+        [JSON.stringify(updatedProduct), id]
+      );
+      return sendJson(res, 200, { message: "Product updated", product: updatedProduct });
     }
 
 
@@ -650,17 +912,10 @@ const server = http.createServer(async (req, res) => {
       const id = pathname.split("/api/products/")[1];
 
 
-      const products = readJsonFile(PRODUCTS_FILE);
-      const filtered = products.filter((p) => p.id !== id);
-
-
-      if (filtered.length === products.length) {
+      const result = await pool.query("DELETE FROM products WHERE id = $1 RETURNING id", [id]);
+      if (!result.rowCount) {
         return sendJson(res, 404, { error: "Product not found." });
       }
-
-
-      writeJsonFile(PRODUCTS_FILE, filtered);
-
 
       return sendJson(res, 200, { message: "Product deleted" });
     }
@@ -676,6 +931,22 @@ const server = http.createServer(async (req, res) => {
       if (!body.items || Object.keys(body.items).length === 0) {
         return sendJson(res, 400, { error: "Order must contain at least one item." });
       }
+      const currentProducts = await getProductsFromDatabase();
+      for (const item of Object.values(body.items)) {
+        if (!item.productId) {
+          return sendJson(res, 400, { error: "Please refresh the menu before placing the order." });
+        }
+        const product = currentProducts.find((entry) => entry.id === item.productId);
+        if (!product || product.status === "hidden" || product.status === "sold_out") {
+          return sendJson(res, 409, { error: `${item.name || "A product"} is no longer available.` });
+        }
+        if (item.optionValue && Array.isArray(product.options)) {
+          const option = product.options.find((entry) => entry.value === item.optionValue);
+          if (!option || option.available === false) {
+            return sendJson(res, 409, { error: `${item.name || "An option"} is sold out.` });
+          }
+        }
+      }
       if (!body.customer || !body.customer.name || !body.customer.phone || !body.customer.email) {
         return sendJson(res, 400, { error: "Customer name, phone, and email are required." });
       }
@@ -685,9 +956,26 @@ const server = http.createServer(async (req, res) => {
       if (body.fulfillment.method === "delivery" && !body.fulfillment.address) {
         return sendJson(res, 400, { error: "Delivery address is required." });
       }
+      if (!getAdminSession(req)) {
+        const settings = await getStoreSettings();
+        const dateError = validateFulfillmentDate(
+          settings,
+          body.fulfillment.date,
+          body.fulfillment.time
+        );
+        if (dateError) return sendJson(res, 409, { error: dateError });
+        const countResult = await pool.query(
+          `SELECT COUNT(*)::int AS count FROM orders
+            WHERE data #>> '{fulfillment,date}' = $1
+              AND COALESCE(data->>'status', '') <> 'cancelled'`,
+          [body.fulfillment.date]
+        );
+        if (countResult.rows[0].count >= settings.dailyOrderLimit) {
+          return sendJson(res, 409, { error: "The selected date is fully booked." });
+        }
+      }
 
 
-      const orders = readJsonFile(ORDERS_FILE);
       const initialStatuses = [
         "awaiting_transfer", "transfer_submitted", "payment_confirmed",
         "preparing", "ready", "completed", "cancelled",
@@ -707,11 +995,7 @@ const server = http.createServer(async (req, res) => {
         status: initialStatuses.includes(body.status) ? body.status : "awaiting_transfer",
       };
 
-
-      orders.push(newOrder);
-      writeJsonFile(ORDERS_FILE, orders);
-
-
+      await saveOrderToDatabase(newOrder);
       return sendJson(res, 201, { message: "Order received", order: newOrder });
     }
 
@@ -719,7 +1003,7 @@ const server = http.createServer(async (req, res) => {
     // --- API: 取得所有訂單(給店家後台看的) ---
     if (pathname === "/api/orders" && req.method === "GET") {
       if (!requireAdmin(req, res)) return;
-      const orders = readJsonFile(ORDERS_FILE);
+      const orders = await getOrdersFromDatabase();
       return sendJson(res, 200, orders);
     }
 
@@ -737,28 +1021,26 @@ const server = http.createServer(async (req, res) => {
           !allowedStatuses.includes(body.status)) {
         return sendJson(res, 400, { error: "Complete order information is required." });
       }
-      const orders = readJsonFile(ORDERS_FILE);
-      const order = orders.find((item) => item.id === id);
-      if (!order) return sendJson(res, 404, { error: "Order not found." });
+      const result = await pool.query("SELECT data FROM orders WHERE id = $1", [id]);
+      if (!result.rowCount) return sendJson(res, 404, { error: "Order not found." });
+      const order = result.rows[0].data;
       order.items = body.items;
       order.total = Number(body.total) || 0;
       order.customer = body.customer;
       order.fulfillment = body.fulfillment;
       order.status = body.status;
       order.updatedAt = new Date().toISOString();
-      writeJsonFile(ORDERS_FILE, orders);
+      await saveOrderToDatabase(order);
       return sendJson(res, 200, { message: "Order updated", order });
     }
 
     if (/^\/api\/orders\/[^/]+$/.test(pathname) && req.method === "DELETE") {
       if (!requireAdmin(req, res)) return;
       const id = decodeURIComponent(pathname.split("/")[3]);
-      const orders = readJsonFile(ORDERS_FILE);
-      const filtered = orders.filter((item) => item.id !== id);
-      if (filtered.length === orders.length) {
+      const result = await pool.query("DELETE FROM orders WHERE id = $1 RETURNING id", [id]);
+      if (!result.rowCount) {
         return sendJson(res, 404, { error: "Order not found." });
       }
-      writeJsonFile(ORDERS_FILE, filtered);
       return sendJson(res, 200, { message: "Order deleted" });
     }
 
@@ -777,13 +1059,11 @@ const server = http.createServer(async (req, res) => {
       }
 
 
-      const orders = readJsonFile(ORDERS_FILE);
-      const order = orders.find((item) => item.id === id);
-
-
-      if (!order) {
+      const result = await pool.query("SELECT data FROM orders WHERE id = $1", [id]);
+      if (!result.rowCount) {
         return sendJson(res, 404, { error: "Order not found." });
       }
+      const order = result.rows[0].data;
 
 
       order.payment = {
@@ -795,7 +1075,7 @@ const server = http.createServer(async (req, res) => {
         submittedAt: new Date().toISOString(),
       };
       order.status = "transfer_submitted";
-      writeJsonFile(ORDERS_FILE, orders);
+      await saveOrderToDatabase(order);
       return sendJson(res, 200, { message: "Transfer information submitted", order });
     }
 
@@ -821,17 +1101,16 @@ const server = http.createServer(async (req, res) => {
       }
 
 
-      const orders = readJsonFile(ORDERS_FILE);
-      const order = orders.find((item) => item.id === id);
-
-
-      if (!order) {
+      const result = await pool.query("SELECT data FROM orders WHERE id = $1", [id]);
+      if (!result.rowCount) {
         return sendJson(res, 404, { error: "Order not found." });
       }
+      const order = result.rows[0].data;
 
 
       order.status = body.status;
-      writeJsonFile(ORDERS_FILE, orders);
+      order.updatedAt = new Date().toISOString();
+      await saveOrderToDatabase(order);
       return sendJson(res, 200, { message: "Order updated", order });
     }
 
