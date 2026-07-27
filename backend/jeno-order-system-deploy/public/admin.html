@@ -202,6 +202,25 @@
     flex-wrap: wrap;
     gap: 8px;
   }
+  .order-filters {
+    display: grid;
+    grid-template-columns: minmax(190px, 1fr) minmax(220px, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 18px;
+    padding: 14px;
+    border-radius: 8px;
+    background: #f7f3ec;
+  }
+  .order-filter-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  .order-results-summary {
+    color: #877d70;
+    font-size: 12px;
+    margin: -7px 0 14px;
+  }
   .order-card-actions { margin-top: 12px; }
   .order-editor {
     display: none;
@@ -352,6 +371,9 @@
     .order-details {
       grid-template-columns: 1fr;
     }
+    .order-filters {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
 </head>
@@ -385,6 +407,26 @@
           <button class="btn btn-primary btn-small" onclick="loadOrders()">Refresh</button>
         </div>
       </div>
+      <div class="order-filters">
+        <div>
+          <label for="orderDateFilter">Pickup / delivery date</label>
+          <input id="orderDateFilter" type="date" onchange="renderOrders()">
+        </div>
+        <div>
+          <label for="orderSort">Sort orders by</label>
+          <select id="orderSort" onchange="renderOrders()">
+            <option value="fulfillment_asc">Pickup date — earliest first</option>
+            <option value="fulfillment_desc">Pickup date — latest first</option>
+            <option value="created_desc">Order placed — newest first</option>
+            <option value="created_asc">Order placed — oldest first</option>
+          </select>
+        </div>
+        <div class="order-filter-buttons">
+          <button class="btn btn-secondary btn-small" type="button" onclick="showTodayOrders()">Today</button>
+          <button class="btn btn-secondary btn-small" type="button" onclick="clearOrderDateFilter()">Show all</button>
+        </div>
+      </div>
+      <p class="order-results-summary" id="orderResultsSummary"></p>
       <div class="order-editor" id="orderEditor">
         <h3 id="orderEditorTitle">Add Order</h3>
         <div class="form-row">
@@ -667,17 +709,39 @@
 
   function renderOrders() {
     const container = document.getElementById("orderListContainer");
+    const dateFilter = document.getElementById("orderDateFilter").value;
+    const sortMode = document.getElementById("orderSort").value;
+    const filteredOrders = allOrders.filter((order) =>
+      !dateFilter || String(order.fulfillment && order.fulfillment.date || "") === dateFilter
+    );
+    const summary = document.getElementById("orderResultsSummary");
+    summary.textContent = dateFilter
+      ? filteredOrders.length + " order(s) for " + dateFilter
+      : allOrders.length + " order(s) shown";
 
 
     if (allOrders.length === 0) {
       container.innerHTML = '<p class="empty-msg">No orders yet.</p>';
       return;
     }
+    if (filteredOrders.length === 0) {
+      container.innerHTML = '<p class="empty-msg">No orders found for the selected date.</p>';
+      return;
+    }
 
 
-    const sortedOrders = [...allOrders].sort((a, b) =>
-      new Date(b.createdAt) - new Date(a.createdAt)
-    );
+    const sortedOrders = [...filteredOrders].sort((a, b) => {
+      if (sortMode === "created_desc") return new Date(b.createdAt) - new Date(a.createdAt);
+      if (sortMode === "created_asc") return new Date(a.createdAt) - new Date(b.createdAt);
+      const aDate = String(a.fulfillment && a.fulfillment.date || "");
+      const bDate = String(b.fulfillment && b.fulfillment.date || "");
+      if (!aDate && !bDate) return new Date(b.createdAt) - new Date(a.createdAt);
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+      const comparison = aDate.localeCompare(bDate);
+      if (comparison === 0) return new Date(b.createdAt) - new Date(a.createdAt);
+      return sortMode === "fulfillment_desc" ? -comparison : comparison;
+    });
 
 
     container.innerHTML = sortedOrders.map((order) => {
@@ -739,6 +803,23 @@
         '<button class="btn btn-danger btn-small" onclick="deleteOrder(\'' +
         encodeURIComponent(order.id) + '\')">Delete</button></div></article>';
     }).join("");
+  }
+
+  function localDateValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
+  }
+
+  function showTodayOrders() {
+    document.getElementById("orderDateFilter").value = localDateValue(new Date());
+    renderOrders();
+  }
+
+  function clearOrderDateFilter() {
+    document.getElementById("orderDateFilter").value = "";
+    renderOrders();
   }
 
 
