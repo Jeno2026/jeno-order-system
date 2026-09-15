@@ -39,13 +39,6 @@ const DEFAULT_STORE_SETTINGS = {
   blackoutDates: [],
   dailyOrderLimit: 10,
   pickupTimes: ["10:00", "12:00", "14:00", "16:00"],
-  contactAddress: "123 Main Street, Richmond, BC",
-  contactPhone: "(604) 555-0123",
-  contactEmail: "hello@jenopatisserie.com",
-  weekdayHours: "Mon - Fri: 8am - 6pm",
-  weekendHours: "Sat - Sun: 9am - 5pm",
-  instagramUrl: "",
-  facebookUrl: "",
 };
 
 
@@ -281,12 +274,6 @@ async function saveOrderToDatabase(order) {
 }
 
 function sanitizeStoreSettings(input) {
-  const cleanText = (value, fallback, maxLength = 250) =>
-    String(value === undefined ? fallback : value).trim().slice(0, maxLength);
-  const cleanUrl = (value) => {
-    const url = String(value || "").trim().slice(0, 500);
-    return !url || /^https:\/\/[^\s]+$/i.test(url) ? url : "";
-  };
   const closedWeekdays = Array.isArray(input.closedWeekdays)
     ? [...new Set(input.closedWeekdays.map(Number).filter((day) => day >= 0 && day <= 6))]
     : [];
@@ -302,13 +289,6 @@ function sanitizeStoreSettings(input) {
     blackoutDates,
     dailyOrderLimit: Math.max(1, Math.min(500, Number(input.dailyOrderLimit) || 1)),
     pickupTimes,
-    contactAddress: cleanText(input.contactAddress, DEFAULT_STORE_SETTINGS.contactAddress),
-    contactPhone: cleanText(input.contactPhone, DEFAULT_STORE_SETTINGS.contactPhone, 80),
-    contactEmail: cleanText(input.contactEmail, DEFAULT_STORE_SETTINGS.contactEmail, 160),
-    weekdayHours: cleanText(input.weekdayHours, DEFAULT_STORE_SETTINGS.weekdayHours),
-    weekendHours: cleanText(input.weekendHours, DEFAULT_STORE_SETTINGS.weekendHours),
-    instagramUrl: cleanUrl(input.instagramUrl),
-    facebookUrl: cleanUrl(input.facebookUrl),
   };
 }
 
@@ -745,45 +725,8 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, products);
     }
 
-    // --- API: 儲存後台指定的商品排列順序 ---
-    if (pathname === "/api/admin/products/reorder" && req.method === "PUT") {
-      if (!requireAdmin(req, res)) return;
-      const body = await readRequestBody(req);
-      const orderedIds = Array.isArray(body.orderedIds)
-        ? [...new Set(body.orderedIds.map(String))]
-        : [];
-      const existingResult = await pool.query(
-        "SELECT id FROM products ORDER BY sort_order ASC, created_at ASC"
-      );
-      const existingIds = existingResult.rows.map((row) => String(row.id));
-      if (
-        orderedIds.length !== existingIds.length ||
-        existingIds.some((id) => !orderedIds.includes(id))
-      ) {
-        return sendJson(res, 400, { error: "The product list changed. Refresh and try again." });
-      }
 
-      const client = await pool.connect();
-      try {
-        await client.query("BEGIN");
-        for (let index = 0; index < orderedIds.length; index += 1) {
-          await client.query(
-            "UPDATE products SET sort_order = $1, updated_at = NOW() WHERE id = $2",
-            [index + 1, orderedIds[index]]
-          );
-        }
-        await client.query("COMMIT");
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      } finally {
-        client.release();
-      }
-      return sendJson(res, 200, { message: "Product order saved." });
-    }
-
-
-    // --- API: 上傳商品圖片（展示版；正式環境建議改用物件儲存） ---
+    // --- API: 驗證商品圖片並回傳 Data URL，由商品資料存入 PostgreSQL ---
     if (pathname === "/api/uploads" && req.method === "POST") {
       if (!requireAdmin(req, res)) return;
       const body = await readRequestBody(req);
@@ -797,12 +740,6 @@ const server = http.createServer(async (req, res) => {
       }
 
 
-      const extensionByType = {
-        "image/png": "png",
-        "image/jpeg": "jpg",
-        "image/webp": "webp",
-        "image/gif": "gif",
-      };
       const imageBuffer = Buffer.from(match[2], "base64");
 
 
@@ -811,17 +748,7 @@ const server = http.createServer(async (req, res) => {
       }
 
 
-      const safeStem = String(body.filename || "product")
-        .replace(/\.[^.]+$/, "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "")
-        .slice(0, 40) || "product";
-      const fileName = safeStem + "-" + Date.now() + "." + extensionByType[match[1]];
-      fs.writeFileSync(path.join(UPLOADS_DIR, fileName), imageBuffer);
-
-
-      return sendJson(res, 201, { image: "/uploads/" + fileName });
+      return sendJson(res, 201, { image: body.data });
     }
 
 
