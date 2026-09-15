@@ -1530,9 +1530,14 @@
       if (!res.ok) throw new Error("Request failed");
 
 
-      showAddStatus(editingProductId ? "Product updated!" : "Product added!", "success");
+      const wasEditing = Boolean(editingProductId);
+      showAddStatus(wasEditing ? "Product updated!" : "Product added!", "success");
       await loadProducts();
-      returnToProductChoices();
+      if (wasEditing) {
+        document.getElementById("productFormPanel").scrollIntoView({ behavior: "smooth" });
+      } else {
+        returnToProductChoices();
+      }
     } catch (err) {
       showAddStatus("Something went wrong. Please try again.", "error");
     }
